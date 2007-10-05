@@ -1,0 +1,67 @@
+#BACKGROUND $imgdir/icons/NICTA.png
+
+# Size of image generated if no background has been defined. If one background is defined, size of background will be used.
+HEIGHT 720
+WIDTH 500
+
+# FONT from 1 to 5 (define size of font that will be used in graph)
+FONT 2
+
+# Position of legend
+KEYPOS 375 10
+
+# Width of the Link Arrows
+LINKWIDTH 4
+
+# HTML file
+HTMLFILE $imgdir/weathermap.html
+
+# label of TITLE
+#TITLE \"NICTA MESH Router Topology Map\"
+# Position of title in graph
+TITLEPOS 130 685
+# Color of background title
+#TITLEBACKGROUND 0 192 0
+# Color of font to display title
+TITLEFOREGROUND 0 0 0
+
+# Define path and name of a png file on server. You may comment this line if you don't want to keep a file of graph.
+OUTPUTFILE $imgdir/$topologyimg
+
+#     low  high   red green blue
+#SCALE   1   10    140     0  255
+#SCALE  10   25     32    32  255
+#SCALE  25   40      0   192  255
+#SCALE  40   55      0   240    0
+#SCALE  55   70    240   240    0
+#SCALE  70   85    255   192    0
+#SCALE  85  100    255     0    0
+
+SCALE   1   100      0     0  192
+
+# Define Nodes
+# NICTA Logo dimension: 168px x 60px
+NODE logo
+#	POSITION 250 375
+	POSITION 84 30
+	ICON $imgdir/icons/NICTA-small.png
+	ICONTPT 100
+
+NODE Camera
+	POSITION 250 60
+	LABEL
+	ICON $imgdir/icons/AXIS207w.png
+	ICONTPT 100
+
+NODE Handheld
+	POSITION 150 660
+	LABEL
+	ICON $imgdir/icons/ux172.png
+	ICONTPT 100
+
+NODE Phone
+	POSITION 350 660
+	LABEL
+	ICON $imgdir/icons/nokia_n93_01.png
+	ICONTPT 100
+
