@@ -1,0 +1,2 @@
+Destination     Gateway         Interface       802.11 type     Channel         Bytes/sec       Packets/sec     Flags          
+10.0.1.5        10.0.1.5        ath0            g               11              0               0                              

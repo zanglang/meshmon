@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>Insert title here</title>
+<script type="text/javascript" src="prototype.js"></script>
+<script type="text/javascript" src="builder.js"></script>
+<script type="text/javascript" src="config.js"></script>
+<script type="text/javascript">
+	var images = []
+	var timer = null;
+	
+	function init() {
+		imagesDiv = $('images');
+		files.each(function(file) {
+			var ele = Builder.node('img', {
+				src: file,
+			});
+			imagesDiv.appendChild(ele);
+			images.push(ele);
+		});
+		$('weathermap').src = 'weathermap.png';
+		timer = setTimeout('refresh()', interval);
+	}
+	
+	function refresh() {
+		var rand = Math.round(Math.random()*10000000000);
+		images.each(function(img, index) { 
+			img.src = files[index] + '?rand=' + rand;
+		});
+		$('weathermap').src = 'weathermap.png?rand=' + rand;
+		timer = setTimeout('refresh()', interval);
+	}
+	
+	function changeInterval() {
+		var ele = $('intervals');
+		interval = (ele[ele.selectedIndex]).value * 1000;
+		if (timer != null) {
+			clearTimeout(timer);
+			timer = setTimeout('refresh()', interval);
+		}
+	}
+</script>
+</head>
+<body onload="init()">
+<table style="border:0px;">
+<tr>
+	<td>
+		<img id="weathermap" />
+	</td>
+	<td>
+		<div id="images">
+		</div>
+		<br/>
+		Refresh interval:<br/>
+		<select id="intervals" onchange="changeInterval()">
+			<option value="1">1</option>
+			<option value="5">5</option>
+			<option value="10">10</option>
+			<option value="30">30</option>
+			<option value="60">60</option>
+		</select>
+	</td>
+</tr>
+</table>
+</body>
+</html>

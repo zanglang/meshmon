@@ -1,0 +1,3 @@
+Destination	Gateway		Interface	802.11 type	Channel		Bytes/sec	Packets/sec	Flags (AODV route flags)
+10.0.1.1	10.0.1.1	ath0		a			50			1024		2			V	
+10.0.1.5	10.0.1.1	ath1		b			11			2255245		242			IR
