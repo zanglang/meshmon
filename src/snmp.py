@@ -9,6 +9,7 @@ try:
 	from pysnmp.entity.rfc3413.oneliner import cmdgen, ntforg
 	from pysnmp.smi import builder
 except:
+	import sys
 	print 'Python library PySNMP 4.x is required!'
 	sys.exit()
 

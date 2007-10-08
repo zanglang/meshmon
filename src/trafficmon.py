@@ -5,23 +5,14 @@ Version 0.1 - Jerry Chong <zanglang@gmail.com>
 Based on meshtraffic.pl by Dirk Lessner, National ICT Australia
 """
 
-from util import MonitorThread, ThreadPool
-import config
-import logging
-import os
-import random
-import rrdtool
-import snmp
-import sys
+import logging, random, rrdtool, sys
+import config, snmp, threads
 
 if (config.Debug):
 	logging.basicConfig(level=logging.DEBUG)
 
 # OID index for each interface
 ifIndices = {}
-
-# pool instance
-thread_pool = ThreadPool()
 
 # Look up OIDs for in/out octets
 InOctets = snmp.load_symbol('IF-MIB', 'ifInOctets')
@@ -34,15 +25,11 @@ class TrafficMon:
 		print 'TrafficMon started.\n' + \
 			'Press <Ctrl>-C to shut down.'
 		
-		
 	def destroy(self):
 		""" Cleaning up """
 
 		print 'Please wait while TrafficMon shuts down...'
-		for thread in thread_pool.get():
-			thread.run_flag = 0
-			try: thread.join()
-			except: pass
+		threads.terminate_all(wait=True)
 		logging.shutdown()
 		sys.exit()
 
@@ -64,25 +51,10 @@ class TrafficMon:
 			logging.debug('Initializing SNMP for ' + `node`)
 			self.init_snmp(node)
 		
-#===============================================================================
-#		num_threads = thread_pool.len() 
-#		if num_threads > 0:
-#			print str(num_threads), 'threads executing...'
-#			while 1:
-#				try:
-#					input = raw_input()
-#				except (EOFError, KeyboardInterrupt):
-#					break;
-#		else:
-#			print 'Nothing to monitor.'
-#		self.destroy()
-#===============================================================================
-
 	def init_rrdtool(self):
 		""" RRDtool stuff """
 		
-		from os import path
-		
+		from os import path		
 		heartbeat = config.TrafficInterval * 2		
 		options = self.options.copy()
 		
@@ -138,22 +110,17 @@ class TrafficMon:
 				if not config.Simulate:
 					logging.debug('Starting SNMP poll thread for ' + `target` + 
 						' ' + oid[0][1])
-					t1 = SnmpPollThread(
+					threads.add(SnmpPollThread(
 						(InOctets + (index + 1,),
 							OutOctets + (index + 1,)),
 						options
-					)
+					))
 				else:
 					logging.debug('Starting simulator thread for ' + `target`)
-					t1 = SimulationThread(options)
-					
-				thread_pool.add(t1)
-				t1.start()
+					threads.add(SimulationThread(options))
 				
 				logging.debug('Starting RRDtool graph thread')
-				t2 = GraphingThread(options)
-				thread_pool.add(t2)
-				t2.start()
+				threads.add(GraphingThread(options))
 
 #------------------------------------------------------------------------------
  
@@ -309,7 +276,7 @@ if __name__ == "__main__":
 	mon = TrafficMon()
 	mon.main()
 	# If we have worker threads running...
-	num_threads = thread_pool.len()
+	num_threads = threads.len()
 	if num_threads > 0:
 		print str(num_threads), 'threads executing...'
 		while 1:

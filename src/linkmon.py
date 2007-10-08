@@ -7,20 +7,13 @@ Version 0.1 - Jerry Chong <zanglang@gmail.com>
 Based on meshmon.pl by Dirk Lessner, National ICT Australia
 """
 
+import logging, os, sys
 from collections import deque
-import aodv
-import config
-import logging
-import os, sys
-import snmp
-from util import MonitorThread, ThreadPool
 from time import sleep
+import aodv, config, snmp, threads
 
 if (config.Debug):
 	logging.basicConfig(level=logging.DEBUG)
-
-# pool for monitor and graph threads
-thread_pool = ThreadPool()
 
 # global routing table store
 routes = {}
@@ -54,10 +47,7 @@ class LinkMon:
 		
 		print 'Please wait while LinkMon shuts down...'
 		# stop worker threads
-		for thread in thread_pool.get():
-			thread.run_flag = 0
-			try: thread.join()
-			except: pass
+		threads.terminate_all(wait=True)
 		logging.shutdown()
 		sys.exit()
 		
@@ -132,13 +122,10 @@ class LinkMon:
 				
 				logging.debug('Starting link poll thread for ' + `target` + 
 					' ' + oid[0][1])
-				t = LinkPollThread(options)
-				thread_pool.add(t)
-				t.start()
-				
-		t = WeathermapThread(options)
-		thread_pool.add(t)
-		t.start()
+				threads.add(LinkPollThread(options))
+		
+		logging.debug('Starting Weathermap thread')		
+		threads.add(WeathermapThread(options))
 
 #------------------------------------------------------------------------------ 
 class LinkPollThread(MonitorThread):
@@ -366,7 +353,7 @@ if __name__ == "__main__":
 	mon = LinkMon()
 	mon.main()
 	# If we have worker threads running...
-	num_threads = thread_pool.len()
+	num_threads = threads.len()
 	if num_threads > 0:
 		print str(num_threads), 'threads executing...'
 		while 1:
