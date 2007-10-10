@@ -15,6 +15,7 @@ class _Node:
 	def __init__(self, address):
 		self.address = address
 		self.interfaces = []
+		self.type = UNKNOWN
 		
 def add(Node):
 	""" Add nodes for collection """

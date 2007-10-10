@@ -26,7 +26,8 @@ Nodes = ('10.0.0.1','10.0.0.5','10.0.0.7')
 
 # A list of the interfaces to be monitored (separate by comma if more than one)
 # Example: 'eth0', 'eth1
-Interfaces = ('ath0','ath1')
+# NOTE: No longer used
+# Interfaces = ('ath0','ath1')
 
 # Which version of SNMP should be used (1 or 2c)
 SnmpVersion = '2c'
