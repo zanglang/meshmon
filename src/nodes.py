@@ -22,7 +22,8 @@ class _Node:
 	def __init__(self, address):
 		self.address = address
 		self.interfaces = []
-		self.neighbours = []
+		self.neighbours = {}
+		self.position = ()
 		self.type = UNKNOWN
 		
 def add(target):
