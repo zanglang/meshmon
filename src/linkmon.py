@@ -124,7 +124,7 @@ class LinkMon:
 					' ' + oid[0][1])
 				threads.add(LinkPollThread(options))
 		
-		logging.debug('Starting Weathermap thread')		
+		logging.debug('Starting Weathermap thread')
 		threads.add(WeathermapThread(options))
 
 #------------------------------------------------------------------------------ 
@@ -172,7 +172,7 @@ class LinkPollThread(MonitorThread):
 			if (self.ip_types[i][0][1] == 3 or
 					self.ip_types[i][0][1] == 4 or
 					self.ip_masks[i] == '255.255.255.255'):
-				logging.debug('Node ' + self.ip_routes[i] + ' is a neighbor')				
+				logging.debug('Node ' + self.ip_routes[i] + ' is a neighbor')			
 				r.append(self.ip_routes[i])
 		# update global store
 		routes[self.target]['routes'] = r
@@ -331,22 +331,6 @@ class WeathermapThread(MonitorThread):
 		# copy over so we can solve flickering
 		os.system('cp %s.tmp %s' % (config.TopologyImg, config.TopologyImg))
 		logging.debug(config.TopologyImg + ' updated')
-
-def get_intermediate(node1, node2):
-	logging.debug('Getting intermediate node for ' + str(node1) + ' ' + str(node2))
-	x = (node1[0] + node2[0])/2
-	y = (node1[1] + node2[1])/2
-	if abs(node1[0] - node2[0]) <  abs(node1[1] - node2[1]):
-		return (x - 40, y), (x + 40, y)
-	else:
-		return (x, y - 40), (x, y + 40)
-
-def parse_routes(routes):
-	"""
-	Parse PySNMP routes into simple lists
-	"""	
-	from pysnmp.proto.rfc1155 import ipAddressPrettyOut
-	return map(lambda r: ipAddressPrettyOut(r[0][1]), routes)	
 
 #------------------------------------------------------------------------------
 if __name__ == "__main__":

@@ -1,11 +1,18 @@
-# node engine
+__doc__ = """
+MeshMon node management
+Version 0.1 - Jerry Chong <zanglang@gmail.com>
+
+Based on meshtraffic.pl by Dirk Lessner, National ICT Australia
+"""
+
+import topology
 
 # enumerated types of nodes, used for
 # 	differentiating the capabilities of nodes
 MOBILE,		# mobile devices
 ROUTER,		# mesh routers. assume to support SNMP
 GENERIC,	# generic nodes
-UNKNOWN = range(3)
+UNKNOWN = range(4)	# this method of doing Python enumerating is not desirable
 
 # currently existing nodes
 collection = []
@@ -15,11 +22,15 @@ class _Node:
 	def __init__(self, address):
 		self.address = address
 		self.interfaces = []
+		self.neighbours = []
 		self.type = UNKNOWN
 		
-def add(Node):
+def add(target):
 	""" Add nodes for collection """
-	collection.append(Node)
+	collection.append(target)
+	# renew mesh topology
+	topology.add(target)
+	topology.refresh()
 
 def create(target):
 	""" Create new mesh node instance """
