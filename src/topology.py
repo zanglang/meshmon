@@ -5,19 +5,24 @@ Version 0.1 - Jerry Chong <zanglang@gmail.com>
 Based on meshtraffic.pl by Dirk Lessner, National ICT Australia
 """
 
-# global routing table store
-routes = {}
+import math, random 
+
+# temporary table for all nodes added
 collection = []
 
-# BUG: These are preselected locations. Only 4 nodes, anymore can't be shown..
-# positions = deque(['75 360', '250 200', '425 360', '250 520'])
-# TODO: read this and 'via' paths from a file so we can get a perfect graph
-positions = deque([(400,260), (100,260), (250,260)])
-#positions = deque([(350,460),(150,460), (250,60), (250,260)])
-
 # size of current mesh topology
-width = 0
-height = 0
+width = 500.0
+height = 520.0
+# number of pixels between nodes
+buffer = 200.0
+# number of pixels in top/bottom margin
+vmargin = 120.0
+# temporary table for allocated nodes
+allocations = {}
+# free layers available
+layers = [0,1]
+# highest layer available
+highlayer = 1
 
 #####
 # TODO Chunks
@@ -26,15 +31,37 @@ height = 0
 def add(node):
 	""" Add a mesh node into the topology and regenerate positions """
 	collection.append(node)
-	try:
+	"""try:
 		node.position = positions.pop()
 		logging.debug('Node ' + node + ' assigned to ' + str(node.position))
 	except IndexError:
 		logging.error('FIXME: Ran out of node positions.')
-		node.position = (0,0)
-
-#-------------------------------------------------------------------------------
-def parse_routes(routes):
-	""" Parse PySNMP routes into simple lists """	
-	from pysnmp.proto.rfc1155 import ipAddressPrettyOut
-	return map(lambda r: ipAddressPrettyOut(r[0][1]), routes)
+		node.position = (0,0)"""
+	
+	if config.DynamicTopology:		
+		# pick a layer and insert the node
+		layer = random.choice(layers)
+		if not allocations.has_key(layer):
+			allocations[layer] = []
+		allocations[layer].append(node)
+		# if a layer already has 3 nodes we consider it "full".
+		# Expand to a new layer to be used later
+		if (len(allocations[layer]) == 3):
+			layers.remove(layer)
+			highlayer += 1
+			layers.append(highlayer)
+		# Readjust the topology. Increase width and height if necessary
+		# Note: using 120 pixels for top/bottom margins
+		if height <= highlayer * buffer + vmargin:
+			height += buffer
+		for layer, allocation in allocations.items():
+			# number of pixels between nodes in the same horizantal line
+			gap = int(math.ceil(width/(len(allocation)+1)))
+			offset = gap
+			# set positions of nodes on layer
+			for n in allocation:
+				n.position = (offset, layer * buffer + vmargin/2)
+				offset += gap
+	else:
+		##### TODO: Check if coordinates were previously defined
+		pass

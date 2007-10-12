@@ -42,6 +42,15 @@ TrafficInterval = 2
 # Network Topology
 #-----------------
 
+# Dynamically calculate topology
+DynamicTopology = True
+
+# Load node coordinates from file using plugins. Automatically disabled
+# if DynamicTopology is enabled
+# Format: ('<plugin>', '<file path>')
+# Example: ('static', 'coords.txt')
+TopologySettings = (None, None)
+
 # Weathermap output file
 TopologyImg = 'weathermap.png'
 
