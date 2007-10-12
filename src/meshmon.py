@@ -6,7 +6,7 @@ Version 0.1 - Jerry Chong <zanglang@gmail.com>
 """
 
 import logging, sys
-import config, gatherers.rrdtool, nodes, threads, util
+import config, nodes, threads, util
 
 if (config.Debug):
 	logging.basicConfig(level=logging.DEBUG)
@@ -18,6 +18,19 @@ if __name__ == "__main__":
 	# create Javascript configuration 
 	util.convert_to_js()
 	### TODO: move into web.py
+	
+	try:
+		# Initialize backends. This is currently hardcoded as we only
+		# have one method to gather and render data at the moment
+		MODULE = 'rrdtool'
+		backend = __import__('plugins.' + MODULE)
+		if not backend.__dict__.has_key('initialize') or \
+				not backend.__dict__.has_key('PLUGIN_INFO'):
+			raise Exception, 'module not a valid plugin.'
+	except:
+		logging.error('Error loading plugin: ' + sys.exc_info()[0])
+		sys.exit()
+	print 'Loaded plugin', backend.PLUGIN_INFO['NAME']
 	
 	# run monitors
 	try:
@@ -31,24 +44,8 @@ if __name__ == "__main__":
 			n.type = nodes.ROUTER
 			nodes.add(n)
 		
-		# finish initialization, start monitoring threads for router nodes
-		logging.debug('Starting AODV thread for ' + `node.address`)
-		threads.add(gatherers.rrdtool.AodvThread(node))
-		
-		# TODO: modularize backends
-		for node in nodes.collection:
-			if (node.type == nodes.ROUTER):
-				if (config.Simulate):
-					logging.debug('Starting SNMP poll thread for ' + `node.address`)
-					threads.add(gatherers.rrdtool.SnmpPollThread(node))	
-				else:
-					logging.debug('Starting simulated SNMP thread for ' + `node.address`)
-					threads.add(gatherers.rrdtool.SimulationPollThread(node))
-					
-				logging.debug('Starting graphing thread for ' + `node.address`)
-				threads.add(rendering.rrdtool.GraphingThread(node))
-				
 		##### TODO: start web.py
+		backend.initialize()
 		
 		num_threads = threads.len()
 		if num_threads > 0:
