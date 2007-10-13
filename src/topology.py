@@ -9,6 +9,8 @@ import math, random
 
 # temporary table for all nodes added
 collection = []
+# tables for pre-read node positions
+positions = {}
 
 # size of current mesh topology
 width = 500.0
@@ -38,7 +40,11 @@ def add(node):
 		logging.error('FIXME: Ran out of node positions.')
 		node.position = (0,0)"""
 	
-	if config.DynamicTopology:		
+	# check if coordinates were previously defined
+	### TODO: add plugin to read NSU/2 files
+	if positions.has_key(node.address):
+		node.position = positions[node,address]
+	elif config.DynamicTopology:
 		# pick a layer and insert the node
 		layer = random.choice(layers)
 		if not allocations.has_key(layer):
@@ -63,5 +69,5 @@ def add(node):
 				n.position = (offset, layer * buffer + vmargin/2)
 				offset += gap
 	else:
-		##### TODO: Check if coordinates were previously defined
+		# any other methods?
 		pass

@@ -1,23 +1,23 @@
 #BACKGROUND $imgdir/icons/NICTA.png
 
 # Size of image generated if no background has been defined. If one background is defined, size of background will be used.
-HEIGHT 520
-WIDTH 500
+HEIGHT $height
+WIDTH $width
 
 # FONT from 1 to 5 (define size of font that will be used in graph)
 #FONT 2
 
 # Position of legend
-KEYPOS 375 15
+KEYPOS $keypos
 
 # Update time position
-TIMEPOS 290 520 Last Updated: %b %d %Y %H:%M:%S
+TIMEPOS $timepos Last Updated: %b %d %Y %H:%M:%S
 
 # Width of the Link Arrows
-# LINKWIDTH 4
+#LINKWIDTH 4
 
 # HTML file
-# HTMLFILE $imgdir/weathermap.html
+#HTMLFILE $imgdir/weathermap.html
 
 # label of TITLE
 #TITLE \"NICTA MESH Router Topology Map\"
@@ -28,7 +28,8 @@ TITLEPOS 130 685
 # Color of font to display title
 #TITLEFOREGROUND 0 0 0
 
-# Define path and name of a png file on server. You may comment this line if you don't want to keep a file of graph.
+# Define path and name of a png file on server.
+# You may comment this line if you don't want to keep a file of graph.
 IMAGEOUTPUTFILE $imgdir/$topologyimg
 
 #     low  high   red green blue
@@ -46,21 +47,5 @@ NODE logo
 	POSITION 84 30
 	ICON $imgdir/icons/NICTA-small.png
 
-NODE Camera
-	POSITION 250 60
-	#POSITION 80 260
-	LABEL Camera
-	ICON $imgdir/icons/AXIS207w.png
 
-NODE Handheld
-	POSITION 150 460
-	#POSITION 420 260
-	LABEL Handheld
-	ICON $imgdir/icons/ux172.png
-
-NODE Phone
-	POSITION 350 460
-	#POSITION 420 460
-	LABEL Phone
-	ICON $imgdir/icons/nokia_n93_01.png
 

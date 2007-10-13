@@ -35,6 +35,9 @@ class WeathermapThread(MonitorThread):
 			conf_template = f.read()
 			f.close()
 			
+			# TODO: read widths and heights from topology
+			
+			
 			# add known routers to weathermap nodes list
 			for node in nodes.collection:
 				position = str(node.position[0]) + ' ' + \
@@ -47,9 +50,13 @@ class WeathermapThread(MonitorThread):
 			conf_template = Template(conf_template).substitute({
 				'dir': config.RrdPath,
 				'ext': config.ImgFormat.lower(),
+				'height': topology.height,
 				'imgdir': config.ImgPath,
 				'int': config.GraphInterval,
-				'topologyimg': config.TopologyImg + '.tmp'
+				'keypos': topology.width * 0.75 + ' 15',
+				'timepos': '290 520',
+				'topologyimg': config.TopologyImg + '.tmp',
+				'width': topology.width
 			})
 			
 			# add links to weathermap

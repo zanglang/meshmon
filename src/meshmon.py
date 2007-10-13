@@ -6,7 +6,7 @@ Version 0.1 - Jerry Chong <zanglang@gmail.com>
 """
 
 import logging, sys
-import config, nodes, threads, util
+import config, nodes, threads, util, webserver
 
 if (config.Debug):
 	logging.basicConfig(level=logging.DEBUG)
@@ -14,10 +14,6 @@ if (config.Debug):
 if __name__ == "__main__":
 	""" Initialize monitoring """
 	print 'TrafficMon started.\nPress <Ctrl>-C to shut down.'
-	
-	# create Javascript configuration 
-	util.convert_to_js()
-	### TODO: move into web.py
 	
 	try:
 		# Initialize backends. This is currently hardcoded as we only
@@ -44,8 +40,8 @@ if __name__ == "__main__":
 			n.type = nodes.ROUTER
 			nodes.add(n)
 		
-		##### TODO: start web.py
 		backend.initialize()
+		webserver.start()
 		
 		num_threads = threads.len()
 		if num_threads > 0:
