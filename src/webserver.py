@@ -4,6 +4,9 @@ Version 0.1 - Jerry Chong <zanglang@gmail.com>
 """
 
 import thread, web
+import config
+
+render = web.template.render('html/')
 
 urls = (
 	'/', 'index',
@@ -13,7 +16,8 @@ urls = (
 class index:
 	""" Index page for web.py """
 	def GET(self):
-		print "Hello, world!"
+		#print "Hello, world!"
+		print render.index('t')
 
 class configure_js:
 	""" Javascript generator. The web interface will parse this script
@@ -29,9 +33,20 @@ class configure_js:
 		
 def start():
 	""" Start internal webserver """
+	
+	# use web.py's error debugging
 	web.webapi.internalerror = web.debugerror
+	
+	# check if the default port has been changed
+	if config.WebServerPort != 8080:
+		import sys
+		sys.argv.append(str(config.WebServerPort))
+	
 	# Not using meshmon's own threads implementation because web.py's API
 	# does not provide methods to kill the webserver. We'll just terminate upon
 	# sys.exit() then.
-	# BUG: temporarily disabled!
 	#thread.start_new_thread(web.run, (urls, globals()))
+	web.run(urls, globals())
+	
+if __name__ == "__main__":
+	start()

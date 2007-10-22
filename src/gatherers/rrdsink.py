@@ -35,7 +35,7 @@ class AodvThread(threads.MonitorThread):
 			text = None
 			############
 			try:
-				text = str(snmp.walk(target.address, 
+				text = str(snmp.walk(target.address,
 						(1,3,6,1,4,1,2021,8))[4][0][1])
 			except Exception, e:
 				logging.error('Unable to get AODV output for ' +
@@ -43,7 +43,7 @@ class AodvThread(threads.MonitorThread):
 				continue
 			############
 			aodv_entries = aodv.parse(text)
-								
+						
 			for entry in aodv_entries:
 				# check if it already exists
 				dest = nodes.find(entry['destination'])
@@ -124,7 +124,6 @@ class GathererThread(threads.MonitorThread):
 		
 		# check which interfaces/indices are to be monitored
 		for index, oid in enumerate(oids):
-			
 			if oid[0][1] in self.target.interfaces:
 				
 				# add SNMP oids to be polled
@@ -153,8 +152,8 @@ class GathererThread(threads.MonitorThread):
 						rrdtool.create(rrd_file,
 							#'-b now -60s',				# Start time now -1 min
 							'-s ' + `config.TrafficInterval`,	# interval
-							'DS:traffic_in:COUNTER:' + `config.TrafficInterval * 2` + ':0:3500000',
-							'DS:traffic_out:COUNTER:' + `config.TrafficInterval * 2` + ':0:3500000',
+							'DS:in:COUNTER:' + `config.TrafficInterval * 2` + ':0:3500000',
+							'DS:out:COUNTER:' + `config.TrafficInterval * 2` + ':0:3500000',
 							'RRA:LAST:0.1:1:720',		# 720 samples of 1 minute (12 hours)
 							#'RRA:LAST:0.1:5:576',		# 576 samples of 5 minutes (48 hours)
 							'RRA:AVERAGE:0.1:1:720',	# 720 samples of 1 minute (12 hours)
@@ -183,11 +182,11 @@ class GathererThread(threads.MonitorThread):
 		# FIXME: Warning - in/out Octets wrap back to 0. Is this handled properly?
 		logging.debug('loop_snmp for ' + `self.target.address`)
 		for index, oids in enumerate(self.oids):
-
 			try:
 				in_query, out_query = \
 					snmp.get(self.target.address, oids[0]), \
 					snmp.get(self.target.address, oids[1])
+				print 'in', in_query, 'out', out_query
 			except Exception, e:
 				logging.error('Could not poll in/out octets for ' +
 					`self.target.address` + ': ' + `e`)
@@ -204,7 +203,7 @@ class GathererThread(threads.MonitorThread):
 				try:
 					rrdtool.update(self.rrd_files[index],
 						'-t',
-						'traffic_in:traffic_out',
+						'in:out',
 						'N:' + str(in_octets) + ':' + str(out_octets)
 					)
 				except rrdtool.error, e:
@@ -269,7 +268,7 @@ class SimulationGathererThread(threads.MonitorThread):
 			try:
 				rrdtool.update(rrd_file,
 					'-t',
-					'traffic_in:traffic_out',
+					'in:out',
 					'N:' + str(self.in_octets[rrd_file]) +
 						':' + str(self.out_octets[rrd_file])
 				)

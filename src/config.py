@@ -111,3 +111,10 @@ ImgTemplate = Template('$imgdir/$host-$if.$ext')
 # For trafficmon, records random flunctuating traffic in RRDtool
 # Should be used for development purposes only!
 Simulate = False
+
+#-----------
+# Web Server
+#-----------
+
+# Change the port of the internal web server (default: 8080)
+WebServerPort = 8080
