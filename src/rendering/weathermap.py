@@ -87,16 +87,11 @@ class WeathermapThread(threads.MonitorThread):
 						'if': interface
 					})
 					
-					print '%s' % node.address
-					print '%s' % neighbour.address
-					print '%s' % interface
-					print '%s' % rrd_file
-					
 					# Is this a parallel link? 0 = first link, >=1 = parallel
 					if links[neighbour] == 1:
-						conf_template += ('LINK MN%s-%s-%s\n\t' +
+						conf_template += (('LINK MN%s-%s-%s\n\t' +
 								'NODES MN%s %s\n\t' +
-								'TARGET %s\n\n' %
+								'TARGET %s\n\n') %
 									(node.address, interface, neighbour.address,
 									node.address, neighbour.address,
 									rrd_file))
@@ -105,9 +100,9 @@ class WeathermapThread(threads.MonitorThread):
 						# this is a parallel link. Calculate node offsets
 						offsets = get_offsets(node.position, links[neighbour])
 						offsets2 = get_offsets(neighbour.position, links[neighbour])
-						conf_template += ('LINK MN%s-%s-%s-%d\n\t' +
+						conf_template += (('LINK MN%s-%s-%s-%d\n\t' +
 								'NODES MN%s:%d:%d  MN%s:%d:%d\n\t' +
-								'TARGET %s\n\n' % (
+								'TARGET %s\n\n') % (
 									node.address, interface,
 									neighbour.address, links[neighbour],
 									node.address, offsets[0], offsets[1]),

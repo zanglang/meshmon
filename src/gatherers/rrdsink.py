@@ -35,7 +35,7 @@ class AodvThread(threads.MonitorThread):
 			text = None
 			############
 			try:
-				text = str(snmp.walk(target.address,
+				text = str(snmp.walk(target.address, 
 						(1,3,6,1,4,1,2021,8))[4][0][1])
 			except Exception, e:
 				logging.error('Unable to get AODV output for ' +
@@ -132,7 +132,7 @@ class GathererThread(threads.MonitorThread):
 				if not oid in self.oids:
 					self.oids.append(oid)
 				else:
-					continue	
+					continue
 					
 				# add rrdtool files to be updated
 				rrd_file = config.RrdTemplate.substitute({
