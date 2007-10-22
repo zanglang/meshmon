@@ -6,7 +6,7 @@ Version 0.1 - Jerry Chong <zanglang@gmail.com>
 """
 
 import logging, sys
-import config, nodes, threads, util, webserver
+import config, nodes, threads, webserver
 
 if (config.Debug):
 	logging.basicConfig(level=logging.DEBUG)
@@ -15,18 +15,22 @@ if __name__ == "__main__":
 	""" Initialize monitoring """
 	print 'TrafficMon started.\nPress <Ctrl>-C to shut down.'
 	
+	backend = None
 	try:
 		# Initialize backends. This is currently hardcoded as we only
 		# have one method to gather and render data at the moment
-		MODULE = 'rrdtool'
+		MODULE = 'RrdTool'
 		backend = __import__('plugins.' + MODULE)
-		if not backend.__dict__.has_key('initialize') or \
-				not backend.__dict__.has_key('PLUGIN_INFO'):
+		plugin = backend.__dict__[MODULE]
+		if not plugin.__dict__.has_key('initialize') or \
+				not plugin.__dict__.has_key('PLUGIN_INFO'):
 			raise Exception, 'module not a valid plugin.'
 	except:
-		logging.error('Error loading plugin: ' + sys.exc_info()[0])
+		import traceback
+		logging.error('Error loading plugin:')
+		traceback.print_exc()
 		sys.exit()
-	print 'Loaded plugin', backend.PLUGIN_INFO['NAME']
+	print 'Loaded plugin', plugin.PLUGIN_INFO['NAME']
 	
 	# run monitors
 	try:
@@ -40,10 +44,10 @@ if __name__ == "__main__":
 			n.type = nodes.ROUTER
 			nodes.add(n)
 		
-		backend.initialize()
+		plugin.initialize()
 		webserver.start()
 		
-		num_threads = threads.len()
+		num_threads = threads.size()
 		if num_threads > 0:
 			print str(num_threads), 'threads executing...'
 			while 1:

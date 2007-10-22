@@ -5,13 +5,16 @@ Version 0.1 - Jerry Chong <zanglang@gmail.com>
 Based on meshtraffic.pl by Dirk Lessner, National ICT Australia
 """
 
-import topology
+import logging, topology
 
 # enumerated types of nodes, used for
 # 	differentiating the capabilities of nodes
-MOBILE,		# mobile devices
-ROUTER,		# mesh routers. assume to support SNMP
-GENERIC,	# generic nodes
+#	MOBILE = mobile devices
+#	ROUTER = mesh routers. assume to support SNMP
+#	GENERIC = generic nodes
+MOBILE, \
+ROUTER,	\
+GENERIC, \
 UNKNOWN = range(4)	# this method of doing Python enumerating is not desirable
 
 # currently existing nodes
@@ -31,11 +34,11 @@ def add(target):
 	collection.append(target)
 	# renew mesh topology
 	topology.add(target)
-	topology.refresh()
 
 def create(target):
 	""" Create new mesh node instance """
-	return Node(target)
+	logging.debug('Creating new node instance for ' + target)
+	return _Node(target)
 	
 def find(target):
 	""" Find the node in collection with the given IP address """

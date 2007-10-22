@@ -33,10 +33,23 @@ case 'viewmap':
 	print "<div id=\"overDiv\" style=\"position:absolute; visibility:hidden; z-index:1000;\"></div>\n";
 	print "<script type=\"text/javascript\" src=\"overlib.js\"><!-- overLIB (c) Erik Bosrup --></script> \n";
 
+	$id = -1;
+
+	if( isset($_REQUEST['id']) && !is_numeric($_REQUEST['id']) )
+	{
+		$id = weathermap_translate_id($_REQUEST['id']);
+	}
+
 	if( isset($_REQUEST['id']) && is_numeric($_REQUEST['id']) )
 	{
-		weathermap_singleview($_REQUEST['id']);
+		$id = intval($_REQUEST['id']);
 	}
+	
+	if($id>=0)
+	{	
+		weathermap_singleview($id);
+	}	
+	
 	weathermap_versionbox();
 
 	include_once($config["base_path"]."/include/bottom_footer.php");
@@ -52,7 +65,11 @@ default:
 	}
 	if(read_config_option("weathermap_pagestyle") == 1)
 	{
-		weathermap_fullview();
+		weathermap_fullview(FALSE,TRUE);
+	}
+	if(read_config_option("weathermap_pagestyle") == 2)
+	{
+		weathermap_fullview(FALSE, TRUE);
 	}
 
 	weathermap_versionbox();
@@ -150,7 +167,7 @@ function weathermap_thumbview()
 	if(sizeof($maplist) == 1)
 	{
 		$pagetitle = "Network Weathermap";
-		weathermap_fullview();
+		weathermap_fullview(FALSE,FALSE);
 	}
 	else
 	{
@@ -215,13 +232,17 @@ function weathermap_thumbview()
 	}
 }
 
-function weathermap_fullview($cycle=FALSE)
+function weathermap_fullview($cycle=FALSE, $firstonly=FALSE)
 {
 	global $colors;
 
 	$_SESSION['custom']=false;
 
-	$maplist = db_fetch_assoc( "select distinct weathermap_maps.* from weathermap_auth,weathermap_maps where weathermap_maps.id=weathermap_auth.mapid and active='on' and (userid=".$_SESSION["sess_user_id"]." or userid=0) order by sortorder, id");
+	$query = "select distinct weathermap_maps.* from weathermap_auth,weathermap_maps where weathermap_maps.id=weathermap_auth.mapid and active='on' and (userid=".$_SESSION["sess_user_id"]." or userid=0) order by sortorder, id";
+
+	if($firstonly) { $query .= " LIMIT 1"; }
+
+	$maplist = db_fetch_assoc( $query );
 	html_graph_start_box(2,true);
 
 	if(sizeof($maplist) == 1)
@@ -406,6 +427,14 @@ function weathermap_fullview($cycle=FALSE)
 	}
 
 
+}
+
+function weathermap_translate_id($idname)
+{
+	$SQL = "select id from weathermap_maps where configfile='".mysql_real_escape_string($idname)."'";
+	$map = db_fetch_assoc($SQL);
+
+	return($map[0]['id']);	
 }
 
 function weathermap_versionbox()

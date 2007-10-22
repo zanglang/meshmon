@@ -31,6 +31,7 @@ class HTML_ImageMap_Area
 		{
 			$h .= " href=\"".$this->href."\" ";
 		}
+		else { $h .= " nohref "; }
 		if($this->extrahtml != "")
 		{
 			$h .= " ".$this->extrahtml." ";
@@ -319,6 +320,32 @@ class HTML_ImageMap
 		}
 		return $count;
 	}
+
+        // update a property on all elements in the map that match a name as a substring
+        // (use it for retro-actively adding in link information to a pre-built geometry before generating HTML)
+        // returns the number of elements that were matched/changed
+        function setPropSub($which, $what, $where)
+        {
+
+                $count = 0;
+                for($i=0; $i<count($this->shapes); $i++)
+                {
+                        if( ($where == "") || ( strstr($this->shapes[$i]->name,$where)!=FALSE ) )
+                        {
+                                switch($which)
+                                {
+                                case 'href':
+                                        $this->shapes[$i]->href= $what;
+                                        break;
+                                case 'extrahtml':
+                                        $this->shapes[$i]->extrahtml= $what;
+                                        break;
+                                }
+                                $count++;
+                        }
+                }
+                return $count;
+        }
 
 	// Return the imagemap as an HTML client-side imagemap for inclusion in a page
 	function asHTML()

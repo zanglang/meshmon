@@ -5,13 +5,13 @@ Version 0.1 - Jerry Chong <zanglang@gmail.com>
 Based on meshtraffic.pl by Dirk Lessner, National ICT Australia
 """
 
-import gamin
+import gamin, os, subprocess
 from string import Template
-import config, nodes, topology
+import config, logging, nodes, threads, topology
 
-class WeathermapThread(MonitorThread):
+class WeathermapThread(threads.MonitorThread):
 	
-	def __init__(self, options):
+	def __init__(self):
 		super(WeathermapThread, self).__init__()
 		self.func = self.loop_weathermap
 		self.interval = config.RefreshInterval
@@ -22,6 +22,7 @@ class WeathermapThread(MonitorThread):
 	
 	def refresh_template(self, path=None, event=None):
 		""" Template has changed, refresh configuration file """
+		
 		# GAMExists event triggers when we first start the thread
 		# GAMChanged triggers when the template file gets updated
 		# Note: if multiple updates were detected, Gamin will call this
@@ -32,6 +33,7 @@ class WeathermapThread(MonitorThread):
 			except IOError:
 				logging.error('Could not find Weathermap conf template, aborting!')
 				return
+			
 			conf_template = f.read()
 			f.close()
 			
@@ -41,30 +43,34 @@ class WeathermapThread(MonitorThread):
 			# add known routers to weathermap nodes list
 			for node in nodes.collection:
 				position = str(node.position[0]) + ' ' + \
-						str(node.position[node][1])
+						str(node.position[1])
+						
 				conf_template += 'NODE MN' + node.address + '\n' + \
 						'\tPOSITION ' + position + '\n' + \
 						'\tLABEL Router_' + node.address + '\n' + \
 						'\tICON $imgdir/icons/Safemesh1.png\n\n'
 						# '\tICONTPT 100\n\n' # not required for PHP Weathermap
+						
 			conf_template = Template(conf_template).substitute({
 				'dir': config.RrdPath,
 				'ext': config.ImgFormat.lower(),
-				'height': topology.height,
+				'height': int(topology.height),
 				'imgdir': config.ImgPath,
 				'int': config.GraphInterval,
-				'keypos': topology.width * 0.75 + ' 15',
+				'keypos': str(int(topology.width * 0.75)) + ' 15',
 				'timepos': '290 520',
 				'topologyimg': config.TopologyImg + '.tmp',
-				'width': topology.width
+				'width': int(topology.width)
 			})
 			
 			# add links to weathermap
 			for node in nodes.collection:
 				links = {}	# temporary links table
+				
 				# neighbour = adjacent gateway nodes
 				# interface = interface last used to communicate with node
 				for neighbour, interface in node.neighbours.items():
+					
 					### TODO: check if to and from are same node, check if
 					### to and from were repeated
 					if links.has_key(neighbour):
@@ -81,23 +87,34 @@ class WeathermapThread(MonitorThread):
 						'if': interface
 					})
 					
+					print '%s' % node.address
+					print '%s' % neighbour.address
+					print '%s' % interface
+					print '%s' % rrd_file
+					
 					# Is this a parallel link? 0 = first link, >=1 = parallel
-					if links[neighbour] == 0:
-						conf_template += ('LINK MN' + node.address + '-' + interface +
-										'-' + neighbour.address + '\n' +
-										'\tNODES MN' + node.address + ' ' +
-										neighbour.address + '\n' +
-										'\tTARGET ' + rrd_file + '\n\n')
+					if links[neighbour] == 1:
+						conf_template += ('LINK MN%s-%s-%s\n\t' +
+								'NODES MN%s %s\n\t' +
+								'TARGET %s\n\n' %
+									(node.address, interface, neighbour.address,
+									node.address, neighbour.address,
+									rrd_file))
+						
 					else:
 						# this is a parallel link. Calculate node offsets
 						offsets = get_offsets(node.position, links[neighbour])
-						conf_template += ('LINK MN' + node.address + '-' + interface +
-										'-' + neighbour.address + '-1\n' +
-										'\tNODES MN' + node.address + ':' + offsets[0] +
-										' ' + neighbour.address + ':' + offsets[1] + '\n' +
-										'\tTARGET ' + rrd_file + '\n\n')
-										# we'll used straight lines for now
-										#'\tVIA ' + position1 + '\n\n')
+						offsets2 = get_offsets(neighbour.position, links[neighbour])
+						conf_template += ('LINK MN%s-%s-%s-%d\n\t' +
+								'NODES MN%s:%d:%d  MN%s:%d:%d\n\t' +
+								'TARGET %s\n\n' % (
+									node.address, interface,
+									neighbour.address, links[neighbour],
+									node.address, offsets[0], offsets[1]),
+									neighbour.address, offsets2[0], offsets2[1],
+									rrd_file)
+									# we'll used straight lines for now
+									#'\tVIA ' + position1 + '\n\n')
 
 					#if config.ShowBandwidth:
 					#	conf_template += ('\tBANDWIDTH ' + `config.Bandwidth` +
@@ -110,6 +127,7 @@ class WeathermapThread(MonitorThread):
 				print >> f, conf_template
 			except:
 				logging.error('Unable to save Weathermap conf template!')
+				
 			f.close()
 			logging.debug('Weathermap configuration updated')
 	
@@ -118,21 +136,34 @@ class WeathermapThread(MonitorThread):
 		
 		if self.mon.event_pending():
 			self.mon.handle_events()
+		else:
+			# BUG: Temporary hack
+			self.refresh_template(event=gamin.GAMExists)
 		
 		# run Weathermap perl script
 		# Uncomment for Perl version -- needs compatible conf.template!
 		# os.system('/usr/bin/weathermap4rrd -c weathermap.conf')
+		#proc = subprocess.Popen(['php','weathermap/weathermap'])
 		os.system('php weathermap/weathermap')
+		#proc.wait()
+		
 		# copy over so we can solve flickering
+		#proc2 = subprocess.Popen(['cp', config.TopologyImg + '.tmp',
+				# config.TopologyImg])
 		os.system('cp %s.tmp %s' % (config.TopologyImg, config.TopologyImg))
+		#proc.wait()
 		logging.debug(config.TopologyImg + ' updated')
+		
 
 def get_intermediate(node1, node2, offset):
 	""" Calculate an intermediate position for VIA links
 		:param offset: Offset factor to increase the distance of the positions"""
+	
 	logging.debug('Getting intermediate node for ' + str(node1) + ' ' + str(node2))
+	
 	x = (node1[0] + node2[0])/2
 	y = (node1[1] + node2[1])/2
+	
 	if abs(node1[0] - node2[0]) <  abs(node1[1] - node2[1]):
 		return (x - 20 * offset, y), (x + 20 * offset, y)
 	else:
@@ -141,7 +172,9 @@ def get_intermediate(node1, node2, offset):
 def get_offsets(node, offset):
 	""" Calculate an intermediate position for VIA links
 		:param offset: Offset factor to increase the distance of the positions"""
+		
 	logging.debug('Getting node offsets for ' + str(node))
+	
 	return offset % 2 == 1 and (node[0] - 20 * offset, node[1] + 20 * offset) or \
 			(node[0] + 20 * offset, node[1] - 20 * offset)
 			

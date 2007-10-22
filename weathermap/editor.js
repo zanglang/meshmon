@@ -162,7 +162,15 @@ function attach_click_events()
             }
         }
 
-    addEvent(document.getElementById('tb_newfile'), 'click', new_file);
+    if(fromplug===1)
+    {
+        addEvent(document.getElementById('tb_newfile'), 'click', function() { window.location = "weathermap-cacti-plugin-mgmt.php"; });
+    }
+    else
+    {
+        addEvent(document.getElementById('tb_newfile'), 'click', new_file);
+    }
+    
     addEvent(document.getElementById('tb_addnode'), 'click', add_node);
     addEvent(document.getElementById('tb_mapprops'), 'click', map_properties);
     addEvent(document.getElementById('tb_mapstyle'), 'click', map_style);
@@ -178,10 +186,17 @@ function attach_click_events()
     addEvent(document.getElementById('tb_node_submit'), 'click', do_submit);
     addEvent(document.getElementById('node_move'), 'click', move_node);
     addEvent(document.getElementById('node_delete'), 'click', delete_node);
+    addEvent(document.getElementById('node_clone'), 'click', clone_node);
+    addEvent(document.getElementById('node_edit'), 'click', edit_node);
+        
+    addEvent(document.getElementById('tb_textedit_cancel'), 'click', cancel_op);
+    addEvent(document.getElementById('tb_textedit_submit'), 'click', do_submit);
+
 
     addEvent(document.getElementById('tb_link_cancel'), 'click', cancel_op);
     addEvent(document.getElementById('tb_link_submit'), 'click', do_submit);
     addEvent(document.getElementById('link_delete'), 'click', delete_link);
+    addEvent(document.getElementById('link_edit'), 'click', edit_link);
 
     addEvent(document.getElementById('tb_map_cancel'), 'click', cancel_op);
     addEvent(document.getElementById('tb_map_submit'), 'click', do_submit);
@@ -202,6 +217,12 @@ function attach_click_events()
     cp = document.getElementById('node_cactipick');
     addEvent(cp, 'click', nodecactipicker);
     cp.setAttribute('href', '#');
+
+    $('#xycapture').mouseover(function(event) {coord_capture(event);});
+    $('#xycapture').mousemove(function(event) {coord_update(event);});
+    $('#xycapture').mouseout(function(event) {coord_release(event);});
+    
+    
     }
 
 // used by the cancel button on each of the properties dialogs
@@ -348,12 +369,16 @@ function click_handler(e)
         // if we're waiting for a node specifically (e.g. "make link") then ignore links here
         if (objecttype == 'NODE')
             {
-            show_node(objectname);
+                // chop off the suffix
+                objectname=objectname.slice(0,objectname.length-2);
+                show_node(objectname);
             }
 
         if (objecttype == 'LINK')
             {
-            show_link(objectname);
+                // chop off the suffix
+                objectname=objectname.slice(0,objectname.length-2);
+                show_link(objectname);
             }
         }
 
@@ -513,6 +538,26 @@ function delete_node()
         }
     }
 
+function clone_node()
+    {
+        document.getElementById('action').value = "clone_node";
+        document.frmMain.submit();
+    }
+
+function edit_node()
+{
+        document.getElementById('action').value = "edit_node";
+        show_itemtext('node',document.frmMain.node_name.value);
+        // document.frmMain.submit();
+   }
+
+function edit_link()
+{
+        document.getElementById('action').value = "edit_link";
+        show_itemtext('link',document.frmMain.link_name.value);
+        // document.frmMain.submit();
+}
+
 function move_node()
     {
     hide_dialog('dlgNodeProperties');
@@ -544,6 +589,7 @@ function map_properties()
     hide_all_dialogs();
     document.getElementById('action').value = "set_map_properties";
     show_dialog('dlgMapProperties');
+    document.getElementById('map_title').focus();
     }
 
 function map_style()
@@ -553,6 +599,7 @@ function map_style()
     hide_all_dialogs();
     document.getElementById('action').value = "set_map_style";
     show_dialog('dlgMapStyle');
+    document.getElementById('mapstyle_linklabels').focus();
     }
 
 function position_timestamp()
@@ -611,6 +658,46 @@ function real_position_legend(scalename)
     mapmode('xy');
 }
 
+function show_itemtext(itemtype,name)
+    {
+    var found = -1;
+    mapmode('existing');
+
+    hide_all_dialogs();
+
+    // $('#dlgNodeProperties').block();
+    
+  //  $.blockUI.defaults.elementMessage = 'Please Wait';
+    
+    $('textarea#item_configtext').val('');
+    
+    if(itemtype==='node')
+    {           
+        $('#action').val('set_node_config');
+    }
+    
+    if(itemtype==='link')
+    {           
+        $('#action').val('set_link_config');
+    }
+    show_dialog('dlgTextEdit');
+    
+//    $('#item_configtext').block();
+    
+    $.ajax( { type: "GET",
+                url: 'editor.php',
+                data: {action: 'fetch_config',
+                        item_type: itemtype,
+                        item_name: name,
+                        mapname: document.frmMain.mapname.value},
+                success: function(text) {
+                        $('#item_configtext').val(text);
+                        document.getElementById('item_configtext').focus();
+                      //  $('#dlgTextEdit').unblock();
+                   }
+           } );
+}
+
 function show_node(name)
     {
     var found = -1;
@@ -626,6 +713,9 @@ function show_node(name)
         document.frmMain.node_name.value = name;
         document.frmMain.node_new_name.value = name;
 
+        document.frmMain.node_x.value = mynode.x;
+        document.frmMain.node_y.value = mynode.y;
+
         document.frmMain.node_name.value = mynode.name;
         document.frmMain.node_new_name.value = mynode.name;
         document.frmMain.node_label.value = mynode.label;
@@ -639,13 +729,13 @@ function show_node(name)
         else
         {
             document.frmMain.node_iconfilename.value = '--NONE--';
-        }
-        
+        }  
 
         // save this here, just in case they choose delete_node or move_node
         document.getElementById('param').value = mynode.name;
 
         show_dialog('dlgNodeProperties');
+        document.getElementById('node_new_name').focus();
         }
     }
 
@@ -692,6 +782,7 @@ function show_link(name)
         document.frmMain.action.value = "set_link_properties";
 
         show_dialog('dlgLinkProperties');
+        document.getElementById('link_bandwidth_in').focus();
         }
     }
 
@@ -714,7 +805,49 @@ function hide_all_dialogs()
     hide_dialog('dlgMapProperties');
     hide_dialog('dlgMapStyle');
     hide_dialog('dlgLinkProperties');
+    hide_dialog('dlgTextEdit');
     hide_dialog('dlgNodeProperties');
     hide_dialog('dlgColours');
     hide_dialog('dlgImages');
     }
+
+function ElementPosition(param){
+  var x=0, y=0;
+  var obj = (typeof param == "string") ? document.getElementById(param) : param;
+  if (obj) {
+    x = obj.offsetLeft;
+    y = obj.offsetTop;
+    var body = document.getElementsByTagName('body')[0];
+    while (obj.offsetParent && obj!=body){
+      x += obj.offsetParent.offsetLeft;
+      y += obj.offsetParent.offsetTop;
+      obj = obj.offsetParent;
+    }
+  }
+  this.x = x;
+  this.y = y;
+}
+
+function coord_capture(event)
+{
+    // $('#tb_coords').html('+++');
+}
+
+function coord_update(event)
+{
+    var cursorx = event.pageX;
+    var cursory = event.pageY;
+ 
+    // Adjust for coords relative to the image, not the document
+    var p = new ElementPosition('xycapture');
+    cursorx -= p.x;
+    cursory -= p.y;
+    cursory++; // fudge to make coords match results from imagemap (not sure why this is needed)
+        
+    $('#tb_coords').html('Position<br />'+ cursorx + ', ' + cursory);
+}
+
+function coord_release(event)
+{
+    $('#tb_coords').html('Position<br />---, ---');
+}

@@ -4,7 +4,7 @@ Version 0.1 - Jerry Chong <zanglang@gmail.com>
 """
 
 from threading import Thread
-import logging, time, traceback
+import config, logging, time, traceback
 
 if (config.Debug):
 	logging.basicConfig(level=logging.DEBUG)
@@ -28,7 +28,7 @@ class MonitorThread(Thread):
 				time.sleep(self.interval)
 		except Exception, e:
 			traceback.print_exc()
-			logging.error('Thread stopped abnormally')
+			logging.error(str(self) + ' stopped abnormally')
 		
 	def __dummy_func(self):
 		""" Override this! """
@@ -54,6 +54,6 @@ def terminate_all(wait=False):
 			try: thread.join()
 			except: pass
 
-def len():
+def size():
 	""" Returns number of threads in pool """
 	return len(pool)

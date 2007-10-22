@@ -12,12 +12,12 @@
 
 function weathermap_version () {
 	return array( 	'name'    	=> 'weathermap',
-		'version'       => '0.91',
+		'version'       => '0.93',
 		'longname'      => 'PHP Network Weathermap',
 		'author'        => 'Howard Jones',
-		'homepage'      => 'http://wotsit.thingy.com/haj/cacti/php-weathermap/',
+		'homepage'      => 'http://www.network-weathermap.com/',
 		'email' 	=> 'howie@thingy.com',
-		'url'           => 'http://wotsit.thingy.com/haj/cacti/versions.php'
+		'url'           => 'http://www.network-weathermap.com/versions.php'
 	);
 }
 
@@ -60,7 +60,7 @@ function weathermap_config_settings () {
 			"friendly_name" => "Page style",
 			"description" => "How to display multiple maps.",
 			"method" => "drop_array",
-			"array" => array(0 => "Thumbnail Overview", 1 => "Full Images")
+			"array" => array(0 => "Thumbnail Overview", 1 => "Full Images", 2 => "Show Only First")
 		),
 		"weathermap_thumbsize" => array(
 			"friendly_name" => "Thumbnail Maximum Size",
@@ -127,7 +127,7 @@ function weathermap_setup_table () {
 	global $config, $database_default;
 	include_once($config["library_path"] . DIRECTORY_SEPARATOR . "database.php");
 
-	$sql = "show tables from " . $database_default;
+	$sql = "show tables";
 	$result = db_fetch_assoc($sql) or die (mysql_error());
 
 	$tables = array();
@@ -178,7 +178,7 @@ function weathermap_setup_table () {
 	// create the settings entries, if necessary
 
 	$pagestyle = read_config_option("weathermap_pagestyle");
-	if($pagestyle == '' or $pagestyle < 0 or $pagestyle >1)
+	if($pagestyle == '' or $pagestyle < 0 or $pagestyle >2)
 	{
 		$sql[] = "replace into settings values('weathermap_pagestyle',0)";
 	}
@@ -232,8 +232,8 @@ function weathermap_setup_table () {
 function weathermap_config_arrays () {
 	global $user_auth_realms, $user_auth_realm_filenames, $menu;
 
-	$user_auth_realms[42]='Configure Weathermap';
-	$user_auth_realms[43]='View Weathermaps';
+	$user_auth_realms[42]='Plugin -> Weathermap: Configure/Manage';
+	$user_auth_realms[43]='Plugin -> Weathermap: View';
 	$user_auth_realm_filenames['weathermap-cacti-plugin.php'] = 43;
 	$user_auth_realm_filenames['weathermap-cacti-plugin-mgmt.php'] = 42;
 
@@ -284,6 +284,7 @@ function weathermap_draw_navigation_text ($nav) {
 	$nav["weathermap-cacti-plugin-mgmt.php:activate_map"] = array("title" => "Weathermap Management", "mapping" => "index.php:", "url" => "weathermap-cacti-plugin-mgmt.php", "level" => "1");
 	$nav["weathermap-cacti-plugin-mgmt.php:deactivate_map"] = array("title" => "Weathermap Management", "mapping" => "index.php:", "url" => "weathermap-cacti-plugin-mgmt.php", "level" => "1");
 	$nav["weathermap-cacti-plugin-mgmt.php:rebuildnow"] = array("title" => "Weathermap Management", "mapping" => "index.php:", "url" => "weathermap-cacti-plugin-mgmt.php", "level" => "1");
+	$nav["weathermap-cacti-plugin-mgmt.php:rebuildnow2"] = array("title" => "Weathermap Management", "mapping" => "index.php:", "url" => "weathermap-cacti-plugin-mgmt.php", "level" => "1");
 	
 	return $nav;
 }
@@ -311,7 +312,7 @@ function weathermap_poller_bottom () {
 	else
 	{
 		// if we're due, run the render updates
-		if( ($rendercounter % $renderperiod) == 0)
+		if( ( $renderperiod == 0) || ( ($rendercounter % $renderperiod) == 0) )
 		{
 			weathermap_run_maps(dirname(__FILE__) );
 		}

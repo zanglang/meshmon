@@ -22,7 +22,8 @@ Debug = True
 
 # A tuple collection of the mobile nodes where traffic data should be collected from
 # Example: '192.168.0.1', '127.0.0.1'
-Nodes = ('10.0.0.1','10.0.0.5','10.0.0.7')
+#Nodes = ('10.0.0.1','10.0.0.5','10.0.0.7')
+Nodes = ('192.168.0.50',)
 
 # A list of the interfaces to be monitored (separate by comma if more than one)
 # Example: 'eth0', 'eth1
@@ -36,7 +37,7 @@ SnmpVersion = '2c'
 Community = 'public'
 
 # Interval for collecting traffic data in seconds
-TrafficInterval = 2
+TrafficInterval = 10
 
 #-----------------
 # Network Topology

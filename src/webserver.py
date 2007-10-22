@@ -33,4 +33,5 @@ def start():
 	# Not using meshmon's own threads implementation because web.py's API
 	# does not provide methods to kill the webserver. We'll just terminate upon
 	# sys.exit() then.
-	thread.start_new_thread(web.run, (urls, globals()))
+	# BUG: temporarily disabled!
+	#thread.start_new_thread(web.run, (urls, globals()))

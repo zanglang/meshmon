@@ -1,12 +1,12 @@
 <?php
-// PHP Weathermap 0.92
+// PHP Weathermap 0.93
 // Copyright Howard Jones, 2005-2007 howie@thingy.com
 // http://www.network-weathermap.com/
 // Released under the GNU Public License
 
 require_once "HTML_ImageMap.class.php";
 
-$WEATHERMAP_VERSION="0.92";
+$WEATHERMAP_VERSION="0.93";
 $weathermap_debugging=FALSE;
 
 // Turn on ALL error reporting for now.
@@ -23,7 +23,7 @@ function module_checks()
 {
 	if (!extension_loaded('gd'))
 	{
-		warn ("\n\nNo image (gd) extension is loaded. This is required by weathermap.\n\n");
+		warn ("\n\nNo image (gd) extension is loaded. This is required by weathermap. [WMWARN20]\n\n");
 		warn ("\nrun check.php to check PHP requirements.\n\n");
 
 		return (FALSE);
@@ -31,21 +31,21 @@ function module_checks()
 
 	if (!function_exists('imagecreatefrompng'))
 	{
-		warn ("Your GD php module doesn't support PNG format.\n");
+		warn ("Your GD php module doesn't support PNG format. [WMWARN21]\n");
 		warn ("\nrun check.php to check PHP requirements.\n\n");
 		return (FALSE);
 	}
 
 	if (!function_exists('imagecreatetruecolor'))
 	{
-		warn ("Your GD php module doesn't support truecolor.\n");
+		warn ("Your GD php module doesn't support truecolor. [WMWARN22]\n");
 		warn ("\nrun check.php to check PHP requirements.\n\n");
 		return (FALSE);
 	}
 
 	if (!function_exists('imagecopyresampled'))
 	{
-		warn ("Your GD php module doesn't support thumbnail creation (imagecopyresampled).\n");
+		warn ("Your GD php module doesn't support thumbnail creation (imagecopyresampled). [WMWARN23]\n");
 	}
 	return (TRUE);
 }
@@ -162,7 +162,7 @@ function imagecreatefromfile($filename)
 			}
 			else
 			{
-				warn("Image file $filename is GIF, but GIF is not supported by your GD library.\n");    
+				warn("Image file $filename is GIF, but GIF is not supported by your GD library. [WMIMG01]\n");    
 			}
 			break;
 
@@ -173,7 +173,7 @@ function imagecreatefromfile($filename)
 			}
 			else
 			{
-				warn("Image file $filename is JPEG, but JPEG is not supported by your GD library.\n");    
+				warn("Image file $filename is JPEG, but JPEG is not supported by your GD library. [WMIMG02]\n");    
 			}
 			break;
 
@@ -184,18 +184,18 @@ function imagecreatefromfile($filename)
 			}
 			else
 			{
-				warn("Image file $filename is PNG, but PNG is not supported by your GD library.\n");    
+				warn("Image file $filename is PNG, but PNG is not supported by your GD library. [WMIMG03]\n");    
 			}
 			break;
 
 		default:
-			warn("Image file $filename wasn't recognised (type=$type). Check format is supported by your GD library.\n");
+			warn("Image file $filename wasn't recognised (type=$type). Check format is supported by your GD library. [WMIMG04]\n");
 			break;
 		}
 	}
 	else
 	{
-		warn("Image file $filename is unreadable. Check permissions.\n");    
+		warn("Image file $filename is unreadable. Check permissions. [WMIMG05]\n");    
 	}
 	return $bgimage;
 }
@@ -331,6 +331,9 @@ function find_distance(&$pointarray, $distance)
 
 	if ($left == $right)
 		return ($left);
+
+	// if the distance is zero, there's no need to search (and it doesn't work anyway)
+	 if($distance==0) return($left);
 
 	// if it's a point past the end of the line, then just return the end of the line
 	// Weathermap should *never* ask for this, anyway
@@ -493,7 +496,7 @@ function draw_curve($image, &$curvepoints, $width, $outlinecolour, $comment_colo
 	# warn("$linkname: Total: $totaldistance $arrowsize $arrowwidth $minimumlength\n");
 	if($totaldistance <= $minimumlength)
 	{
-		warn("Skipping drawing very short link ($linkname). Impossible to draw! Try changing WIDTH or ARROWSTYLE?\n");
+		warn("Skipping drawing very short link ($linkname). Impossible to draw! Try changing WIDTH or ARROWSTYLE? [WMWARN01]\n");
 		return;
 	}
 
@@ -580,8 +583,9 @@ function draw_curve($image, &$curvepoints, $width, $outlinecolour, $comment_colo
 		if (!is_null($fillcolours[$arrayindex]))
 			{ imagefilledpolygon($image, $there_points, count($there_points) / 2, $arrowsettings[$dir][4]); }
 		
-		$map->imap->addArea("Polygon", "LINK:" . $linkname, '', $there_points);
-		debug ("Adding Poly imagemap for $linkname\n");
+		$areaname = "LINK:" . $linkname. ":$dir";
+		$map->imap->addArea("Polygon", $areaname, '', $there_points);
+		debug ("Adding Poly imagemap for $areaname\n");
 
 		if (!is_null($outlinecolour))
 			imagepolygon($image, $there_points, count($there_points) / 2, $arrowsettings[$dir][5]);
@@ -696,13 +700,16 @@ function format_number($number, $precision = 2, $trailing_zeroes = 0)
 	else { return ($integer . "." . $decimal); }
 }
 
-function nice_bandwidth($number, $kilo = 1000,$decimals=1)
+function nice_bandwidth($number, $kilo = 1000,$decimals=1,$below_one=TRUE)
 {
 	$suffix='';
 
 	if ($number == 0)
 		return '0';
 
+	$milli = 1/$kilo;
+	$micro = 1/$milli;
+	$nano = 1/$micro;
 	$mega=$kilo * $kilo;
 	$giga=$mega * $kilo;
 	$tera=$giga * $kilo;
@@ -726,6 +733,26 @@ function nice_bandwidth($number, $kilo = 1000,$decimals=1)
 	{
 		$number/=$kilo;
 		$suffix="K";
+	}
+        elseif ($number > 1)
+        {
+                $number = $number;
+                $suffix="";
+        }
+	elseif (($below_one==TRUE) && ($number > $milli))
+	{
+		$number/=$milli;
+		$suffix="m";
+	}
+	elseif (($below_one==TRUE) && ($number > $micro))
+	{
+		$number/=$micro;
+		$suffix="u";
+	}
+	elseif (($below_one==TRUE) && ($number > $nano))
+	{
+		$number/=$nano;
+		$suffix="n";
 	}
 
 	$result=format_number($number, $decimals) . $suffix;
@@ -763,6 +790,11 @@ function nice_scalar($number, $kilo = 1000, $decimals=1)
 		$number/=$kilo;
 		$suffix="K";
 	}
+        elseif ($number > 1)
+        {
+                $number = $number;
+                $suffix="";
+        }
 	elseif ($number < (1 / ($kilo)))
 	{
 		$number=$number * $mega;
@@ -816,6 +848,75 @@ class Vector
 	}
 }
 
+class Colour
+{
+	var $r,$g,$b;
+	
+	// take in an existing value and create a Colour object for it
+	function Colour()
+	{
+		if(func_num_args() == 3) # a set of 3 colours
+		{
+			$this->r = func_get_arg(0); # r
+			$this->g = func_get_arg(1); # g
+			$this->b = func_get_arg(2); # b
+			#print "3 args";
+			#print $this->as_string()."--";
+		}
+		
+		if( (func_num_args() == 1) && gettype(func_get_arg(0))=='array' ) # an array of 3 colours
+		{
+			#print "1 args";
+			$ary = func_get_arg(0);
+			$this->r = $ary[0];
+			$this->g = $ary[1];
+			$this->b = $ary[2];
+		}
+	}
+	
+	// Is this a transparent/none colour?
+	function is_none()
+	{
+		if($this->r == -1 && $this->r == -1 && $this->r == -1)
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+	
+	// allocate a colour in the appropriate image context
+	// - things like scale colours are used in multiple images now (the scale, several nodes, the main map...)
+	function gdallocate($image_ref)
+	{
+		return(myimagecolorallocate($image_ref, $this->r, $this->g, $this->b));
+	}
+	
+	// based on an idea from: http://www.bennadel.com/index.cfm?dax=blog:902.view
+	function contrast()
+	{
+		if( (($this->r + $this->g + $this->b) > 500)
+		 || ($this->g > 140)
+		)
+		{
+			return( array(0,0,0) );
+		}
+		else
+		{
+			return( array(255,255,255) );
+		}
+	}
+	
+	// make a printable version, for debugging
+	// - optionally take a format string, so we can use it for other things (like WriteConfig, or hex in stylesheets)
+	function as_string($format = "RGB(%d,%d,%d)")
+	{
+		return (sprintf($format, $this->r, $this->g, $this->b));
+	}
+}
+
 // ***********************************************
 
 // template class for data sources. All data sources extend this class.
@@ -865,7 +966,6 @@ class WeatherMapBase
 		$this->notes[$name] = $value;
 	}
 
-
 	function get_note($name)
 	{
 		if(isset($this->notes[$name]))
@@ -909,9 +1009,9 @@ class WeatherMapItem extends WeatherMapBase
 	var $overlibwidth, $overlibheight;
 	var $overlibcaption;
 	var $my_default;
+	var $config_override;	# used by the editor to allow text-editing
 
 	function my_type() {  return "ITEM"; }
-
 }
 
 
@@ -1031,6 +1131,40 @@ class WeatherMapNode extends WeatherMapItem
 		$icon_w = 0;
 		$icon_h = 0;
 
+		$col = new Colour(-1,-1,-1);
+		# print $col->as_string();
+		   
+		// if a target is specified, and you haven't forced no background, then the background will
+		// come from the SCALE in USESCALE
+		if( !empty($this->targets) && $this->usescale != 'none' )
+		{
+			$pc = 0;
+			
+			if($this->scalevar == 'in')
+			{
+				$pc = $this->inpercent;
+				
+			}
+			if($this->scalevar == 'out')
+			{
+				$pc = $this->outpercent;
+				
+			}
+			
+			// debug("Choosing NODE BGCOLOR for ".$this->name." based on $pc %\n");
+
+			    list($col,$node_scalekey) = $map->NewColourFromPercent($pc, $this->usescale,$this->name);
+			    // $map->nodes[$this->name]->scalekey = $node_scalekey;
+		}
+		elseif($this->labelbgcolour != array(-1,-1,-1))
+		{
+			// $col=myimagecolorallocate($node_im, $this->labelbgcolour[0], $this->labelbgcolour[1], $this->labelbgcolour[2]);
+			$col = new Colour($this->labelbgcolour);
+		}
+
+		# print $col->as_string();
+		
+
 		// figure out a bounding rectangle for the label
 		if ($this->label != '')
 		{
@@ -1067,64 +1201,121 @@ class WeatherMapNode extends WeatherMapItem
 		// figure out a bounding rectangle for the icon
 		if ($this->iconfile != '')
 		{
-			$this->iconfile = $map->ProcessString($this->iconfile ,$this);
-			if (is_readable($this->iconfile))
+			$icon_im = NULL;
+			$icon_w = 0;
+			$icon_h = 0;
+			
+			if($this->iconfile == 'inpie' || $this->iconfile == 'nink' || $this->iconfile == 'box' || $this->iconfile == 'outpie' || $this->iconfile == 'round')
 			{
-				imagealphablending($im, true);
-				// draw the supplied icon, instead of the labelled box
-
-				$icon_im = imagecreatefromfile($this->iconfile);
-				# $icon_im = imagecreatefrompng($this->iconfile);
-
-				if ($icon_im)
+				// this is an artificial icon - we don't load a file for it
+				
+				// XXX - add the actual DRAWING CODE!
+								
+				$icon_im = imagecreatetruecolor($this->iconscalew,$this->iconscaleh);
+				imageSaveAlpha($icon_im, TRUE);
+		
+				$nothing=imagecolorallocatealpha($icon_im,128,0,0,127);
+				imagefill($icon_im, 0, 0, $nothing);
+				
+				$ink = imagecolorallocate($icon_im,0,0,0);
+				// $fill = imagecolorallocate($icon_im,255,255,255);
+				if($this->iconfile=='box')
 				{
-					$icon_w = imagesx($icon_im);
-					$icon_h = imagesy($icon_im);
-
-					if(($this->iconscalew * $this->iconscaleh) > 0)
+					imagefilledrectangle($icon_im, 0, 0, $this->iconscalew-1, $this->iconscaleh-1, $col->gdallocate($icon_im));
+					if ($this->labeloutlinecolour != array(-1,-1,-1))
 					{
-						imagealphablending($icon_im, true);
-
-						debug("SCALING ICON here\n");
-						if($icon_w > $icon_h)
-						{
-							$scalefactor = $icon_w/$this->iconscalew;
-						}
-						else
-						{
-							$scalefactor = $icon_h/$this->iconscaleh;
-						}
-						$new_width = $icon_w / $scalefactor;
-						$new_height = $icon_h / $scalefactor;
-						$scaled = imagecreatetruecolor($new_width, $new_height);
-						imagealphablending($scaled,false);
-						imagecopyresampled($scaled, $icon_im, 0, 0, 0, 0, $new_width, $new_height, $icon_w, $icon_h);
-						imagedestroy($icon_im);
-						$icon_im = $scaled;
-						$icon_w = imagesx($icon_im);
-						$icon_h = imagesy($icon_im);
+						$ink=myimagecolorallocate($icon_im,$this->labeloutlinecolour[0],
+							$this->labeloutlinecolour[1], $this->labeloutlinecolour[2]);
+						# imagerectangle($node_im, $label_x1, $label_y1, $label_x2, $label_y2, $ink);
+						imagerectangle($icon_im, 0, 0, $this->iconscalew-1, $this->iconscaleh-1, $ink);
 					}
-
-					$icon_x1 = $this->x - $icon_w / 2;
-					$icon_y1 = $this->y - $icon_h / 2;
-					$icon_x2 = $this->x + $icon_w / 2;
-					$icon_y2 = $this->y + $icon_h / 2;
-
-					# $this->width = imagesx($icon_im);
-					# $this->height = imagesy($icon_im);
-					$map->nodes[$this->name]->width = imagesx($icon_im);
-					$map->nodes[$this->name]->height = imagesy($icon_im);
-
-					$map->imap->addArea("Rectangle", "NODE:" . $this->name, '', array($icon_x1, $icon_y1, $icon_x2, $icon_y2));
-
+					
 				}
-				else { warn ("Couldn't open PNG ICON: " . $this->iconfile . " - is it a PNG?\n"); }
+				
+				if($this->iconfile=='round')
+				{
+					$rx = $this->iconscalew/2-1;
+					$ry = $this->iconscaleh/2-1;
+					imagefilledellipse($icon_im,$rx,$ry,$rx*2,$ry*2,$col->gdallocate($icon_im));
+					if ($this->labeloutlinecolour != array(-1,-1,-1))
+					{
+						$ink=myimagecolorallocate($icon_im,$this->labeloutlinecolour[0],
+							$this->labeloutlinecolour[1], $this->labeloutlinecolour[2]);
+						# imagerectangle($icon_im, 0, 0, $this->iconscalew-1, $this->iconscaleh-1, $ink);
+						imageellipse($icon_im,$rx,$ry,$rx*2,$ry*2,$ink);
+					}					
+				}
+				
+				if($this->iconfile=='inpie') { warn('inpie not implemented yet [WMWARN99]'); }
+				if($this->iconfile=='outpie') { warn('outpie not implemented yet [WMWARN99]'); }
+				
 			}
 			else
 			{
-				warn ("ICON " . $this->iconfile . " does not exist, or is not readable. Check path and permissions.\n");
+				$this->iconfile = $map->ProcessString($this->iconfile ,$this);
+				if (is_readable($this->iconfile))
+				{
+					imagealphablending($im, true);
+					// draw the supplied icon, instead of the labelled box
+	
+					$icon_im = imagecreatefromfile($this->iconfile);
+					# $icon_im = imagecreatefrompng($this->iconfile);
+	
+					if ($icon_im)
+					{
+						$icon_w = imagesx($icon_im);
+						$icon_h = imagesy($icon_im);
+	
+						if(($this->iconscalew * $this->iconscaleh) > 0)
+						{
+							imagealphablending($icon_im, true);
+	
+							debug("SCALING ICON here\n");
+							if($icon_w > $icon_h)
+							{
+								$scalefactor = $icon_w/$this->iconscalew;
+							}
+							else
+							{
+								$scalefactor = $icon_h/$this->iconscaleh;
+							}
+							$new_width = $icon_w / $scalefactor;
+							$new_height = $icon_h / $scalefactor;
+							$scaled = imagecreatetruecolor($new_width, $new_height);
+							imagealphablending($scaled,false);
+							imagecopyresampled($scaled, $icon_im, 0, 0, 0, 0, $new_width, $new_height, $icon_w, $icon_h);
+							imagedestroy($icon_im);
+							$icon_im = $scaled;
+							
+						}
+					}
+					else { warn ("Couldn't open PNG ICON: " . $this->iconfile . " - is it a PNG?\n"); }
+				}
+				else
+				{
+					warn ("ICON " . $this->iconfile . " does not exist, or is not readable. Check path and permissions.\n");
+				}
 			}
+
+			if($icon_im)
+			{
+				$icon_w = imagesx($icon_im);
+				$icon_h = imagesy($icon_im);
+							
+				$icon_x1 = $this->x - $icon_w / 2;
+				$icon_y1 = $this->y - $icon_h / 2;
+				$icon_x2 = $this->x + $icon_w / 2;
+				$icon_y2 = $this->y + $icon_h / 2;
+				
+				$map->nodes[$this->name]->width = imagesx($icon_im);
+				$map->nodes[$this->name]->height = imagesy($icon_im);
+	
+				$map->imap->addArea("Rectangle", "NODE:" . $this->name . ':0', '', array($icon_x1, $icon_y1, $icon_x2, $icon_y2));
+			}
+			
 		}
+
+		
 
 		// do any offset calculations
 
@@ -1150,7 +1341,7 @@ class WeatherMapNode extends WeatherMapItem
 
 		if($this->label != '')
 		{
-			$map->imap->addArea("Rectangle", "NODE:" . $this->name, '', array($label_x1, $label_y1, $label_x2, $label_y2));
+			$map->imap->addArea("Rectangle", "NODE:" . $this->name .':1', '', array($label_x1, $label_y1, $label_x2, $label_y2));
 		}
 
 		// work out the bounding box of the whole thing
@@ -1177,6 +1368,8 @@ class WeatherMapNode extends WeatherMapItem
 
 		$nothing=imagecolorallocatealpha($node_im,128,0,0,127);
 		imagefill($node_im, 0, 0, $nothing);
+		
+		#$col = $col->gdallocate($node_im);
 
 		// imagefilledrectangle($node_im,0,0,$temp_width,$temp_height,  $nothing);
 
@@ -1210,38 +1403,11 @@ class WeatherMapNode extends WeatherMapItem
 
 			// if there's an icon, then you can choose to have no background
 			
-			$col = -1;
-		   
-			// if a target is specified, and you haven't forced no background, then the background will
-			// come from the SCALE in USESCALE
-			if( !empty($this->targets) && $this->usescale != 'none' )
-			{
-				$pc = 0;
-				
-				if($this->scalevar == 'in')
-				{
-					$pc = $this->inpercent;
-					
-				}
-				if($this->scalevar == 'out')
-				{
-					$pc = $this->outpercent;
-					
-				}
-				
-				// debug("Choosing NODE BGCOLOR for ".$this->name." based on $pc %\n");
-	
-				    list($col,$node_scalekey) = $map->ColourFromPercent($pc, $this->usescale,$this->name);
-				    // $map->nodes[$this->name]->scalekey = $node_scalekey;
-			}
-			elseif($this->labelbgcolour != array(-1,-1,-1))
-			{
-				$col=myimagecolorallocate($node_im, $this->labelbgcolour[0], $this->labelbgcolour[1], $this->labelbgcolour[2]);
-			}
+			
 
-			if($col != -1)
+			if(! $col->is_none() )
 			{
-			    imagefilledrectangle($node_im, $label_x1, $label_y1, $label_x2, $label_y2, $col);
+			    imagefilledrectangle($node_im, $label_x1, $label_y1, $label_x2, $label_y2, $col->gdallocate($node_im));
 			}
 
 			if ($this->selected)
@@ -1422,168 +1588,176 @@ class WeatherMapNode extends WeatherMapItem
 		foreach (array_keys($this->inherit_fieldlist)as $fld) { $this->$fld=$source->$fld; }
 	}
 
-	function WriteConfig($fd)
+	function WriteConfig()
 	{
 		$output='';
-
-		$comparison=($this->name == 'DEFAULT'
-			? $this->inherit_fieldlist['label'] : $this->owner->defaultnode->label);
-
-		if ($this->label != $comparison) { $output.="\tLABEL " . $this->label . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['infourl'] : $this->owner->defaultnode->infourl);
-
-		if ($this->infourl != $comparison) { $output.="\tINFOURL " . $this->infourl . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['notestext'] : $this->owner->defaultnode->notestext);
-
-		if ($this->notestext != $comparison) { $output.="\tNOTES " . $this->notestext . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['overliburl'] : $this->owner->defaultnode->overliburl);
-
-		if ($this->overliburl != $comparison) { $output.="\tOVERLIBGRAPH " . $this->overliburl . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['iconfile'] : $this->owner->defaultnode->iconfile);
-		if ($this->iconfile != $comparison) { 
-			$output.="\tICON ";
-			if($this->iconscalew > 0) {
-				$output .= $this->iconscalew." ".$this->iconscaleh." ";
-			}
-			$output .= $this->iconfile . "\n"; 
-		}
-
-		$comparison=($this->name == 'DEFAULT'
-			? $this->inherit_fieldlist['labelfont'] : $this->owner->defaultnode->labelfont);
-
-		if ($this->labelfont != $comparison) { $output.="\tLABELFONT " . $this->labelfont . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['labeloffset'] : $this->owner->defaultnode->labeloffset);
-
-		if ($this->labeloffset != $comparison) { $output.="\tLABELOFFSET " . $this->labeloffset . "\n"; }
-
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['targets'] : $this->owner->defaultnode->targets);
-
-		if ($this->targets != $comparison)
-		{
-			$output.="\tTARGET";
-
-			foreach ($this->targets as $target) { $output.=" " . $target[4]; }
-
-			$output.="\n";
-		}
-
-		$comparison = ($this->name == 'DEFAULT'
-			? $this->inherit_fieldlist['usescale'] : $this->owner->defaultnode->usescale);
-		$comparison2 = ($this->name == 'DEFAULT'
-			? $this->inherit_fieldlist['scalevar'] : $this->owner->defaultnode->scalevar);
-
-		if ( ($this->usescale != $comparison) || ($this->scalevar != $comparison2) )
-		{ $output.="\tUSESCALE " . $this->usescale . " " . $this->scalevar . "\n"; }
-
-
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['overlibcaption'] : $this->owner->defaultnode->overlibcaption);
-
-		if ($this->overlibcaption != $comparison) { $output.="\tOVERLIBCAPTION " . $this->overlibcaption . "\n"; }
-
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['overlibwidth'] : $this->owner->defaultnode->overlibwidth);
-
-		if ($this->overlibwidth != $comparison) { $output.="\tOVERLIBWIDTH " . $this->overlibwidth . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['overlibheight'] : $this->owner->defaultnode->overlibheight);
-
-		if ($this->overlibheight != $comparison) { $output.="\tOVERLIBHEIGHT " . $this->overlibheight . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['labelbgcolour'] : $this->owner->defaultnode->labelbgcolour);
-
-		if ($this->labelbgcolour != $comparison) { $output.="\tLABELBGCOLOR " . render_colour(
-			$this->labelbgcolour)
-			. "\n"; }
-
-		$comparison=($this->name == 'DEFAULT' ? $this->inherit_fieldlist['labelfontcolour']
-		: $this->owner->defaultnode->labelfontcolour);
-
-		if ($this->labelfontcolour != $comparison) { $output.="\tLABELFONTCOLOR " . render_colour(
-			$this->labelfontcolour)
-			. "\n"; }
-
-		$comparison=($this->name == 'DEFAULT' ? $this->inherit_fieldlist['labeloutlinecolour']
-		: $this->owner->defaultnode->labeloutlinecolour);
-
-		if ($this->labeloutlinecolour != $comparison) { $output.="\tLABELOUTLINECOLOR " . render_colour(
-			$this->labeloutlinecolour) . "\n";
-		}
-
-		$comparison=($this->name == 'DEFAULT' ? $this->inherit_fieldlist['labelfontshadowcolour']
-			: $this->owner->defaultnode->labelfontshadowcolour);
-
-		if ($this->labelfontshadowcolour != $comparison)
-		{ $output.="\tLABELFONTSHADOWCOLOR " . render_colour($this->labelfontshadowcolour) . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['labeloffsetx'] : $this->owner->defaultnode->labeloffsetx);
-		$comparison2=($this->name == 'DEFAULT'
-			? $this->inherit_fieldlist['labeloffsety'] : $this->owner->defaultnode->labeloffsety);
-
-		if (($this->labeloffsetx != $comparison) || ($this->labeloffsety != $comparison2))
-		{ $output.="\tLABELOFFSET " . $this->labeloffsetx . " " . $this->labeloffsety . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT' ? $this->inherit_fieldlist['x'] : $this->owner->defaultnode->x);
-		$comparison2=($this->name == 'DEFAULT' ? $this->inherit_fieldlist['y'] : $this->owner->defaultnode->y);
-
-		if (($this->x != $comparison) || ($this->y != $comparison2))
-		{
-			if($this->relative_to == '')
-			{ $output.="\tPOSITION " . $this->x . " " . $this->y . "\n"; }
-			else
-			{ $output.="\tPOSITION " . $this->relative_to . " " .  $this->original_x . " " . $this->original_y . "\n"; }
-		}
-
-		if (($this->max_bandwidth_in != $this->owner->defaultnode->max_bandwidth_in)
-			|| ($this->max_bandwidth_out != $this->owner->defaultnode->max_bandwidth_out)
-				|| ($this->name == 'DEFAULT'))
-		{
-			if ($this->max_bandwidth_in == $this->max_bandwidth_out)
-			{ $output.="\tMAXVALUE " . $this->max_bandwidth_in_cfg . "\n"; }
-			else { $output
-			.="\tMAXVALUE " . $this->max_bandwidth_in_cfg . " " . $this->max_bandwidth_out_cfg . "\n"; }
-		}
 		
-        foreach ($this->hints as $hintname=>$hint)
+		// This allows the editor to wholesale-replace a single node's configuration
+		// at write-time - it should include the leading NODE xyz line (to allow for renaming)
+		if($this->config_override != '')
 		{
-		  // all hints for DEFAULT node are for writing
-		  // only changed ones, or unique ones, otherwise
-		      if( 
-                    ($this->name == 'DEFAULT')
-                  ||
-		            (isset($this->owner->defaultnode->hints[$hintname]) 
-		            &&
-		            $this->owner->defaultnode->hints[$hintname] != $hint)
-		          ||
-		            (!isset($this->owner->defaultnode->hints[$hintname]))
-		        )
-		      {		      
-                    $output .= "\tSET $hintname $hint\n";
-		      }
+			$output  = $this->config_override."\n";
 		}
-
-		if ($output != '')
+		else
 		{
-			fwrite($fd, "NODE " . $this->name . "\n");
-			fwrite($fd, "$output\n");
+			$comparison=($this->name == 'DEFAULT'
+				? $this->inherit_fieldlist['label'] : $this->owner->defaultnode->label);
+	
+			if ($this->label != $comparison) { $output.="\tLABEL " . $this->label . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['infourl'] : $this->owner->defaultnode->infourl);
+	
+			if ($this->infourl != $comparison) { $output.="\tINFOURL " . $this->infourl . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['notestext'] : $this->owner->defaultnode->notestext);
+	
+			if ($this->notestext != $comparison) { $output.="\tNOTES " . $this->notestext . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['overliburl'] : $this->owner->defaultnode->overliburl);
+	
+			if ($this->overliburl != $comparison) { $output.="\tOVERLIBGRAPH " . $this->overliburl . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['iconfile'] : $this->owner->defaultnode->iconfile);
+			if ($this->iconfile != $comparison) { 
+				$output.="\tICON ";
+				if($this->iconscalew > 0) {
+					$output .= $this->iconscalew." ".$this->iconscaleh." ";
+				}
+				$output .= $this->iconfile . "\n"; 
+			}
+	
+			$comparison=($this->name == 'DEFAULT'
+				? $this->inherit_fieldlist['labelfont'] : $this->owner->defaultnode->labelfont);
+	
+			if ($this->labelfont != $comparison) { $output.="\tLABELFONT " . $this->labelfont . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['labeloffset'] : $this->owner->defaultnode->labeloffset);
+	
+			if ($this->labeloffset != $comparison) { $output.="\tLABELOFFSET " . $this->labeloffset . "\n"; }
+	
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['targets'] : $this->owner->defaultnode->targets);
+	
+			if ($this->targets != $comparison)
+			{
+				$output.="\tTARGET";
+	
+				foreach ($this->targets as $target) { $output.=" " . $target[4]; }
+	
+				$output.="\n";
+			}
+	
+			$comparison = ($this->name == 'DEFAULT'
+				? $this->inherit_fieldlist['usescale'] : $this->owner->defaultnode->usescale);
+			$comparison2 = ($this->name == 'DEFAULT'
+				? $this->inherit_fieldlist['scalevar'] : $this->owner->defaultnode->scalevar);
+	
+			if ( ($this->usescale != $comparison) || ($this->scalevar != $comparison2) )
+			{ $output.="\tUSESCALE " . $this->usescale . " " . $this->scalevar . "\n"; }
+	
+	
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['overlibcaption'] : $this->owner->defaultnode->overlibcaption);
+	
+			if ($this->overlibcaption != $comparison) { $output.="\tOVERLIBCAPTION " . $this->overlibcaption . "\n"; }
+	
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['overlibwidth'] : $this->owner->defaultnode->overlibwidth);
+	
+			if ($this->overlibwidth != $comparison) { $output.="\tOVERLIBWIDTH " . $this->overlibwidth . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['overlibheight'] : $this->owner->defaultnode->overlibheight);
+	
+			if ($this->overlibheight != $comparison) { $output.="\tOVERLIBHEIGHT " . $this->overlibheight . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['labelbgcolour'] : $this->owner->defaultnode->labelbgcolour);
+	
+			if ($this->labelbgcolour != $comparison) { $output.="\tLABELBGCOLOR " . render_colour(
+				$this->labelbgcolour)
+				. "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT' ? $this->inherit_fieldlist['labelfontcolour']
+			: $this->owner->defaultnode->labelfontcolour);
+	
+			if ($this->labelfontcolour != $comparison) { $output.="\tLABELFONTCOLOR " . render_colour(
+				$this->labelfontcolour)
+				. "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT' ? $this->inherit_fieldlist['labeloutlinecolour']
+			: $this->owner->defaultnode->labeloutlinecolour);
+	
+			if ($this->labeloutlinecolour != $comparison) { $output.="\tLABELOUTLINECOLOR " . render_colour(
+				$this->labeloutlinecolour) . "\n";
+			}
+	
+			$comparison=($this->name == 'DEFAULT' ? $this->inherit_fieldlist['labelfontshadowcolour']
+				: $this->owner->defaultnode->labelfontshadowcolour);
+	
+			if ($this->labelfontshadowcolour != $comparison)
+			{ $output.="\tLABELFONTSHADOWCOLOR " . render_colour($this->labelfontshadowcolour) . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['labeloffsetx'] : $this->owner->defaultnode->labeloffsetx);
+			$comparison2=($this->name == 'DEFAULT'
+				? $this->inherit_fieldlist['labeloffsety'] : $this->owner->defaultnode->labeloffsety);
+	
+			if (($this->labeloffsetx != $comparison) || ($this->labeloffsety != $comparison2))
+			{ $output.="\tLABELOFFSET " . $this->labeloffsetx . " " . $this->labeloffsety . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT' ? $this->inherit_fieldlist['x'] : $this->owner->defaultnode->x);
+			$comparison2=($this->name == 'DEFAULT' ? $this->inherit_fieldlist['y'] : $this->owner->defaultnode->y);
+	
+			if (($this->x != $comparison) || ($this->y != $comparison2))
+			{
+				if($this->relative_to == '')
+				{ $output.="\tPOSITION " . $this->x . " " . $this->y . "\n"; }
+				else
+				{ $output.="\tPOSITION " . $this->relative_to . " " .  $this->original_x . " " . $this->original_y . "\n"; }
+			}
+	
+			if (($this->max_bandwidth_in != $this->owner->defaultnode->max_bandwidth_in)
+				|| ($this->max_bandwidth_out != $this->owner->defaultnode->max_bandwidth_out)
+					|| ($this->name == 'DEFAULT'))
+			{
+				if ($this->max_bandwidth_in == $this->max_bandwidth_out)
+				{ $output.="\tMAXVALUE " . $this->max_bandwidth_in_cfg . "\n"; }
+				else { $output
+				.="\tMAXVALUE " . $this->max_bandwidth_in_cfg . " " . $this->max_bandwidth_out_cfg . "\n"; }
+			}
+			
+			foreach ($this->hints as $hintname=>$hint)
+			{
+			  // all hints for DEFAULT node are for writing
+			  // only changed ones, or unique ones, otherwise
+			      if( 
+			    ($this->name == 'DEFAULT')
+			  ||
+				    (isset($this->owner->defaultnode->hints[$hintname]) 
+				    &&
+				    $this->owner->defaultnode->hints[$hintname] != $hint)
+				  ||
+				    (!isset($this->owner->defaultnode->hints[$hintname]))
+				)
+			      {		      
+			    $output .= "\tSET $hintname $hint\n";
+			      }
+			}
+			if ($output != '')
+			{
+				$output = "NODE " . $this->name . "\n$output\n";
+			}
 		}
+		return ($output);
 	}
 
 	function asJS()
@@ -1604,21 +1778,26 @@ class WeatherMapNode extends WeatherMapItem
 		return $js;
 	}
 
-	function asJSON()
+	function asJSON($complete=TRUE)
 	{
 		$js = '';
 		$js .= "" . js_escape($this->name) . ": {";
 		$js .= "x:" . ($this->x - $this->centre_x). ", ";
 		$js .= "y:" . ($this->y - $this->centre_y) . ", ";
-		$js .= "label:" . js_escape($this->label) . ", ";
+		$js .= "cx:" . $this->centre_x. ", ";
+		$js .= "cy:" . $this->centre_y . ", ";
 		$js .= "name:" . js_escape($this->name) . ", ";
-		$js .= "infourl:" . js_escape($this->infourl) . ", ";
-		$js .= "overliburl:" . js_escape($this->overliburl) . ", ";
-		$js.="overlibcaption:" . js_escape($this->overlibcaption) . ", ";
-
-		$js .= "overlibwidth:" . $this->overlibheight . ", ";
-		$js .= "overlibheight:" . $this->overlibwidth . ", ";
-		$js .= "iconfile:" . js_escape($this->iconfile). ", ";
+		if($complete)
+		{
+			$js .= "label:" . js_escape($this->label) . ", ";
+			$js .= "infourl:" . js_escape($this->infourl) . ", ";
+			$js .= "overliburl:" . js_escape($this->overliburl) . ", ";
+			$js .= "overlibcaption:" . js_escape($this->overlibcaption) . ", ";
+	
+			$js .= "overlibwidth:" . $this->overlibheight . ", ";
+			$js .= "overlibheight:" . $this->overlibwidth . ", ";
+			$js .= "iconfile:" . js_escape($this->iconfile). ", ";
+		}
 		$js .= "iconcachefile:" . js_escape($this->cachefile);
 		$js .= "},\n";
 		return $js;
@@ -1673,7 +1852,7 @@ class WeatherMapNode extends WeatherMapItem
 					$y2=$this->y + $h / 2;
 
 					imagecopy($im, $temp_im, $x1, $y1, 0, 0, $w, $h);
-					$map->imap->addArea("Rectangle", "NODE:" . $this->name, '', array($x1, $y1, $x2, $y2));
+					$map->imap->addArea("Rectangle", "NODE:" . $this->name.':2', '', array($x1, $y1, $x2, $y2));
 					imagedestroy ($temp_im);
 
 					if ($this->labeloffset != '')
@@ -1758,7 +1937,7 @@ class WeatherMapNode extends WeatherMapItem
 				$this->labelfontcolour[2]);
 			$map->myimagestring($im, $font, $txt_x, $txt_y, $this->label, $col);
 
-			$map->imap->addArea("Rectangle", "NODE:" . $this->name, '', array($x1, $y1, $x2, $y2));
+			$map->imap->addArea("Rectangle", "NODE:" . $this->name. ':3', '', array($x1, $y1, $x2, $y2));
 		}
 	}
 }
@@ -1901,7 +2080,7 @@ class WeatherMapLink extends WeatherMapItem
 			if($comment != '')
 			{
 				// XXX - redundant extra variable
-				$startindex = $start[$dir];
+				// $startindex = $start[$dir];
 				$extra_percent = $commentpos[$dir];
 				
 				$font = $this->commentfont;
@@ -1915,25 +2094,24 @@ class WeatherMapLink extends WeatherMapItem
 				# $comment_index = find_distance($curvepoints,$extra);
 				
 				list($x,$y,$comment_index,$angle) = find_distance_coords_angle($curvepoints,$extra);
+				if($comment_index!=0)
+				{
 				$dx = $x - $curvepoints[$comment_index][0];
 				$dy = $y - $curvepoints[$comment_index][1];
+				}
+				else
+				{
+				$dx = $curvepoints[$comment_index+1][0] - $x;
+				$dy = $curvepoints[$comment_index+1][1] - $y;
+				}
 								
-				#$ratio = ($extra - $curvepoints[$comment_index][2]) / ($curvepoints[$comment_index + 1][2] - $curvepoints[$comment_index][2]);
-				#$dx = -$curvepoints[$startindex][0] +  ($curvepoints[$comment_index][0] + $ratio * ($curvepoints[$comment_index + 1][0] - $curvepoints[$comment_index][0]));
-				#$dy = -$curvepoints[$startindex][1] +  ($curvepoints[$comment_index][1] + $ratio * ($curvepoints[$comment_index + 1][1] - $curvepoints[$comment_index][1]));
-				// we need the angle to draw the text 
-				#$angle = rad2deg(atan2(-$dy,$dx));
 				// find the normal to our link, so we can get outside the arrow
 				
 				$l=sqrt(($dx * $dx) + ($dy * $dy));
 				$dx = $dx/$l; 	$dy = $dy/$l;
 				$nx = $dy;  $ny = -$dx;
+				$flipped=FALSE;
 				
-				# warn($commentpos[$dir]." $extra/$totaldistance ".$comment_index."\n");
-				# warn("$dx/$dy  $nx/$ny\n");
-				#$edge_x = $x + $nudge*$dx + $nx * ($width + 4);
-				#$edge_y = $y + $nudge*$dy + $ny * ($width + 4);
-				$flipped = FALSE;				
 				// if the text will be upside-down, rotate it, flip it, and right-justify it
 				// not quite as catchy as Missy's version
 				if(abs($angle)>90)
@@ -2035,8 +2213,8 @@ class WeatherMapLink extends WeatherMapItem
 		$xpoints[]=$x2;
 		$ypoints[]=$y2;
 
-		list($link_in_colour,$link_in_scalekey) = $map->ColourFromPercent($this->inpercent,$this->usescale,$this->name);
-		list($link_out_colour,$link_out_scalekey) = $map->ColourFromPercent($this->outpercent,$this->usescale,$this->name);
+		list($link_in_colour,$link_in_scalekey) = $map->ColourFromPercent($im, $this->inpercent,$this->usescale,$this->name);
+		list($link_out_colour,$link_out_scalekey) = $map->ColourFromPercent($im, $this->outpercent,$this->usescale,$this->name);
 		
 	//	$map->links[$this->name]->inscalekey = $link_in_scalekey;
 	//	$map->links[$this->name]->outscalekey = $link_out_scalekey;
@@ -2086,7 +2264,8 @@ class WeatherMapLink extends WeatherMapItem
 					0,
 					$this->outpercent,
 					$this->bandwidth_out,
-					$q1_angle
+					$q1_angle,
+					OUT
 				);
 
 			$inbound=array
@@ -2097,7 +2276,8 @@ class WeatherMapLink extends WeatherMapItem
 					0,
 					$this->inpercent,
 					$this->bandwidth_in,
-					$q3_angle
+					$q3_angle,
+					IN
 				);
 
 			if ($map->sizedebug)
@@ -2122,12 +2302,12 @@ class WeatherMapLink extends WeatherMapItem
 					if($this->labelboxstyle == 'angled')
 					{
 						$map->DrawLabelRotated($im, $task[0],            $task[1],$task[6],           $thelabel, $this->bwfont, $padding,
-							$this->name,  $this->bwfontcolour, $this->bwboxcolour, $this->bwoutlinecolour,$map);
+							$this->name,  $this->bwfontcolour, $this->bwboxcolour, $this->bwoutlinecolour,$map, $task[7]);
 					}
 					else
 					{
 						$map->DrawLabel($im, $task[0],            $task[1],           $thelabel, $this->bwfont, $padding,
-							$this->name,  $this->bwfontcolour, $this->bwboxcolour, $this->bwoutlinecolour,$map);
+							$this->name,  $this->bwfontcolour, $this->bwboxcolour, $this->bwoutlinecolour,$map, $task[7]);
 					}
 					
 				}
@@ -2135,207 +2315,214 @@ class WeatherMapLink extends WeatherMapItem
 		}
 	}
 
-	function WriteConfig($fd)
+	function WriteConfig()
 	{
 		$output='';
 
-		$comparison=($this->name == 'DEFAULT'
-			? $this->inherit_fieldlist['infourl'] : $this->owner->defaultlink->infourl);
-
-		if ($this->infourl != $comparison) { $output.="\tINFOURL " . $this->infourl . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['notestext'] : $this->owner->defaultlink->notestext);
-
-		if ($this->notestext != $comparison) { $output.="\tNOTES " . $this->notestext . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['overliburl'] : $this->owner->defaultlink->overliburl);
-
-		if ($this->overliburl != $comparison) { $output.="\tOVERLIBGRAPH " . $this->overliburl . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['overlibcaption'] : $this->owner->defaultlink->overlibcaption);
-
-		if ($this->overlibcaption != $comparison) { $output.="\tOVERLIBCAPTION " . $this->overlibcaption . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['overlibwidth'] : $this->owner->defaultlink->overlibwidth);
-
-		if ($this->overlibwidth != $comparison) { $output.="\tOVERLIBWIDTH " . $this->overlibwidth . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['overlibheight'] : $this->owner->defaultlink->overlibheight);
-
-		if ($this->overlibheight != $comparison) { $output.="\tOVERLIBHEIGHT " . $this->overlibheight . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['arrowstyle'] : $this->owner->defaultlink->arrowstyle);
-
-		if ($this->arrowstyle != $comparison) { $output.="\tARROWSTYLE " . $this->arrowstyle . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? ($this->inherit_fieldlist['labelstyle']) : ($this->owner->defaultlink->labelstyle));
-		if ($this->labelstyle != $comparison) { $output.="\tBWLABEL " . $this->labelstyle . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? ($this->inherit_fieldlist['labelboxstyle']) : ($this->owner->defaultlink->labelboxstyle));
-		if ($this->labelboxstyle != $comparison) { $output.="\tBWSTYLE " . $this->labelboxstyle . "\n"; }
-
-		$comparison = ($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['labeloffset_in'] : $this->owner->defaultlink->labeloffset_in);
-		$comparison2 = ($this->name == 'DEFAULT'
-			? $this->inherit_fieldlist['labeloffset_out'] : $this->owner->defaultlink->labeloffset_out);
-
-		if ( ($this->labeloffset_in != $comparison) || ($this->labeloffset_out != $comparison2) )
-		{ $output.="\tBWLABELPOS " . $this->labeloffset_in . " " . $this->labeloffset_out . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? ($this->inherit_fieldlist['commentoffset_in'].":".$this->inherit_fieldlist['commentoffset_out']) : ($this->owner->defaultlink->commentoffset_in.":".$this->owner->defaultlink->commentoffset_out));
-		$mine = $this->commentoffset_in.":".$this->commentoffset_out;
-		if ($mine != $comparison) { $output.="\tCOMMENTPOS " . $this->commentoffset_in." ".$this->commentoffset_out. "\n"; }
-
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['targets'] : $this->owner->defaultlink->targets);
-
-		if ($this->targets != $comparison)
+		if($this->config_override != '')
 		{
-			$output.="\tTARGET";
-
-			foreach ($this->targets as $target) { $output.=" " . $target[4]; }
-
-			$output.="\n";
+			$output  = $this->config_override."\n";
 		}
-
-		$comparison=($this->name == 'DEFAULT'
+		else
+		{
+			$comparison=($this->name == 'DEFAULT'
+				? $this->inherit_fieldlist['infourl'] : $this->owner->defaultlink->infourl);
+	
+			if ($this->infourl != $comparison) { $output.="\tINFOURL " . $this->infourl . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['notestext'] : $this->owner->defaultlink->notestext);
+	
+			if ($this->notestext != $comparison) { $output.="\tNOTES " . $this->notestext . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['overliburl'] : $this->owner->defaultlink->overliburl);
+	
+			if ($this->overliburl != $comparison) { $output.="\tOVERLIBGRAPH " . $this->overliburl . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['overlibcaption'] : $this->owner->defaultlink->overlibcaption);
+	
+			if ($this->overlibcaption != $comparison) { $output.="\tOVERLIBCAPTION " . $this->overlibcaption . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['overlibwidth'] : $this->owner->defaultlink->overlibwidth);
+	
+			if ($this->overlibwidth != $comparison) { $output.="\tOVERLIBWIDTH " . $this->overlibwidth . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['overlibheight'] : $this->owner->defaultlink->overlibheight);
+	
+			if ($this->overlibheight != $comparison) { $output.="\tOVERLIBHEIGHT " . $this->overlibheight . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['arrowstyle'] : $this->owner->defaultlink->arrowstyle);
+	
+			if ($this->arrowstyle != $comparison) { $output.="\tARROWSTYLE " . $this->arrowstyle . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? ($this->inherit_fieldlist['labelstyle']) : ($this->owner->defaultlink->labelstyle));
+			if ($this->labelstyle != $comparison) { $output.="\tBWLABEL " . $this->labelstyle . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? ($this->inherit_fieldlist['labelboxstyle']) : ($this->owner->defaultlink->labelboxstyle));
+			if ($this->labelboxstyle != $comparison) { $output.="\tBWSTYLE " . $this->labelboxstyle . "\n"; }
+	
+			$comparison = ($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['labeloffset_in'] : $this->owner->defaultlink->labeloffset_in);
+			$comparison2 = ($this->name == 'DEFAULT'
+				? $this->inherit_fieldlist['labeloffset_out'] : $this->owner->defaultlink->labeloffset_out);
+	
+			if ( ($this->labeloffset_in != $comparison) || ($this->labeloffset_out != $comparison2) )
+			{ $output.="\tBWLABELPOS " . $this->labeloffset_in . " " . $this->labeloffset_out . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? ($this->inherit_fieldlist['commentoffset_in'].":".$this->inherit_fieldlist['commentoffset_out']) : ($this->owner->defaultlink->commentoffset_in.":".$this->owner->defaultlink->commentoffset_out));
+			$mine = $this->commentoffset_in.":".$this->commentoffset_out;
+			if ($mine != $comparison) { $output.="\tCOMMENTPOS " . $this->commentoffset_in." ".$this->commentoffset_out. "\n"; }
+	
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['targets'] : $this->owner->defaultlink->targets);
+	
+			if ($this->targets != $comparison)
+			{
+				$output.="\tTARGET";
+	
+				foreach ($this->targets as $target) { $output.=" " . $target[4]; }
+	
+				$output.="\n";
+			}
+	
+			$comparison=($this->name == 'DEFAULT'
+				? $this->inherit_fieldlist['usescale'] : $this->owner->defaultlink->usescale);
+			if ($this->usescale != $comparison) { $output.="\tUSESCALE " . $this->usescale . "\n"; }
+	
+	
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['comments'][IN] : $this->owner->defaultlink->comments[IN]);
+			if ($this->comments[IN] != $comparison) { $output.="\tINCOMMENT " . $this->comments[IN] . "\n"; }
+	
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['comments'][OUT] : $this->owner->defaultlink->comments[OUT]);
+			if ($this->comments[OUT] != $comparison) { $output.="\tOUTCOMMENT " . $this->comments[OUT] . "\n"; }
+	
+	
+	
+			$comparison=($this->name == 'DEFAULT'
 			? $this->inherit_fieldlist['usescale'] : $this->owner->defaultlink->usescale);
-		if ($this->usescale != $comparison) { $output.="\tUSESCALE " . $this->usescale . "\n"; }
-
-
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['comments'][IN] : $this->owner->defaultlink->comments[IN]);
-		if ($this->comments[IN] != $comparison) { $output.="\tINCOMMENT " . $this->comments[IN] . "\n"; }
-
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['comments'][OUT] : $this->owner->defaultlink->comments[OUT]);
-		if ($this->comments[OUT] != $comparison) { $output.="\tOUTCOMMENT " . $this->comments[OUT] . "\n"; }
-
-
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['usescale'] : $this->owner->defaultlink->usescale);
-		if ($this->usescale != $comparison) { $output.="\tUSESCALE " . $this->usescale . "\n"; }
-
-
-
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['bwfont'] : $this->owner->defaultlink->bwfont);
-
-		if ($this->bwfont != $comparison) { $output.="\tBWFONT " . $this->bwfont . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['commentfont'] : $this->owner->defaultlink->commentfont);
-
-		if ($this->commentfont != $comparison) { $output.="\tCOMMENTFONT " . $this->commentfont . "\n"; }
-
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['width'] : $this->owner->defaultlink->width);
-
-		if ($this->width != $comparison) { $output.="\tWIDTH " . $this->width . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['outlinecolour'] : $this->owner->defaultlink->outlinecolour);
-
-		if ($this->outlinecolour != $comparison) { $output.="\tOUTLINECOLOR " . render_colour(
-			$this->outlinecolour)
-			. "\n"; }
-
-		$comparison=($this->name == 'DEFAULT' ? $this->inherit_fieldlist['bwoutlinecolour']
-		: $this->owner->defaultlink->bwoutlinecolour);
-
-		if ($this->bwoutlinecolour != $comparison) { $output.="\tBWOUTLINECOLOR " . render_colour(
-			$this->bwoutlinecolour)
-			. "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['bwfontcolour'] : $this->owner->defaultlink->bwfontcolour);
-
-		if ($this->bwfontcolour != $comparison) { $output.="\tBWFONTCOLOR " . render_colour(
-			$this->bwfontcolour) . "\n"; }
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['commentfontcolour'] : $this->owner->defaultlink->commentfontcolour);
-
-		if ($this->commentfontcolour != $comparison) { $output.="\tCOMMENTFONTCOLOR " . render_colour(
-			$this->commentfontcolour) . "\n"; }
-
-
-		$comparison=($this->name == 'DEFAULT'
-		? $this->inherit_fieldlist['bwboxcolour'] : $this->owner->defaultlink->bwboxcolour);
-
-		if ($this->bwboxcolour != $comparison) { $output.="\tBWBOXCOLOR " . render_colour(
-			$this->bwboxcolour) . "\n"; }
-
-		if (isset($this->a) && isset($this->b))
-		{
-			$output.="\tNODES " . $this->a->name;
-
-			if ($this->a_offset != 'C')
-				$output.=":" . $this->a_offset;
-
-			$output.=" " . $this->b->name;
-
-			if ($this->b_offset != 'C')
-				$output.=":" . $this->b_offset;
-
-			$output.="\n";
+			if ($this->usescale != $comparison) { $output.="\tUSESCALE " . $this->usescale . "\n"; }
+	
+	
+	
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['bwfont'] : $this->owner->defaultlink->bwfont);
+	
+			if ($this->bwfont != $comparison) { $output.="\tBWFONT " . $this->bwfont . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['commentfont'] : $this->owner->defaultlink->commentfont);
+	
+			if ($this->commentfont != $comparison) { $output.="\tCOMMENTFONT " . $this->commentfont . "\n"; }
+	
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['width'] : $this->owner->defaultlink->width);
+	
+			if ($this->width != $comparison) { $output.="\tWIDTH " . $this->width . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['outlinecolour'] : $this->owner->defaultlink->outlinecolour);
+	
+			if ($this->outlinecolour != $comparison) { $output.="\tOUTLINECOLOR " . render_colour(
+				$this->outlinecolour)
+				. "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT' ? $this->inherit_fieldlist['bwoutlinecolour']
+			: $this->owner->defaultlink->bwoutlinecolour);
+	
+			if ($this->bwoutlinecolour != $comparison) { $output.="\tBWOUTLINECOLOR " . render_colour(
+				$this->bwoutlinecolour)
+				. "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['bwfontcolour'] : $this->owner->defaultlink->bwfontcolour);
+	
+			if ($this->bwfontcolour != $comparison) { $output.="\tBWFONTCOLOR " . render_colour(
+				$this->bwfontcolour) . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['commentfontcolour'] : $this->owner->defaultlink->commentfontcolour);
+	
+			if ($this->commentfontcolour != $comparison) { $output.="\tCOMMENTFONTCOLOR " . render_colour(
+				$this->commentfontcolour) . "\n"; }
+	
+	
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['bwboxcolour'] : $this->owner->defaultlink->bwboxcolour);
+	
+			if ($this->bwboxcolour != $comparison) { $output.="\tBWBOXCOLOR " . render_colour(
+				$this->bwboxcolour) . "\n"; }
+	
+			if (isset($this->a) && isset($this->b))
+			{
+				$output.="\tNODES " . $this->a->name;
+	
+				if ($this->a_offset != 'C')
+					$output.=":" . $this->a_offset;
+	
+				$output.=" " . $this->b->name;
+	
+				if ($this->b_offset != 'C')
+					$output.=":" . $this->b_offset;
+	
+				$output.="\n";
+			}
+	
+			if (count($this->vialist) > 0)
+			{
+				foreach ($this->vialist as $via)
+					$output.=sprintf("\tVIA %d %d\n", $via[0], $via[1]);
+			}
+	
+			if (($this->max_bandwidth_in != $this->owner->defaultlink->max_bandwidth_in)
+				|| ($this->max_bandwidth_out != $this->owner->defaultlink->max_bandwidth_out)
+					|| ($this->name == 'DEFAULT'))
+			{
+				if ($this->max_bandwidth_in == $this->max_bandwidth_out)
+				{ $output.="\tBANDWIDTH " . $this->max_bandwidth_in_cfg . "\n"; }
+				else { $output
+				.="\tBANDWIDTH " . $this->max_bandwidth_in_cfg . " " . $this->max_bandwidth_out_cfg . "\n"; }
+			}
+	
+	
+			foreach ($this->hints as $hintname=>$hint)
+			{
+			  // all hints for DEFAULT node are for writing
+			  // only changed ones, or unique ones, otherwise
+			      if( 
+			    ($this->name == 'DEFAULT')
+			  ||
+				    (isset($this->owner->defaultlink->hints[$hintname]) 
+				    &&
+				    $this->owner->defaultlink->hints[$hintname] != $hint)
+				  ||
+				    (!isset($this->owner->defaultlink->hints[$hintname]))
+				)
+			      {		      
+			    $output .= "\tSET $hintname $hint\n";
+			      }
+			}
+	
+			if ($output != '')
+			{
+				$output = "LINK " . $this->name . "\n".$output."\n";
+			}
 		}
-
-		if (count($this->vialist) > 0)
-		{
-			foreach ($this->vialist as $via)
-				$output.=sprintf("\tVIA %d %d\n", $via[0], $via[1]);
-		}
-
-		if (($this->max_bandwidth_in != $this->owner->defaultlink->max_bandwidth_in)
-			|| ($this->max_bandwidth_out != $this->owner->defaultlink->max_bandwidth_out)
-				|| ($this->name == 'DEFAULT'))
-		{
-			if ($this->max_bandwidth_in == $this->max_bandwidth_out)
-			{ $output.="\tBANDWIDTH " . $this->max_bandwidth_in_cfg . "\n"; }
-			else { $output
-			.="\tBANDWIDTH " . $this->max_bandwidth_in_cfg . " " . $this->max_bandwidth_out_cfg . "\n"; }
-		}
-
-
-        foreach ($this->hints as $hintname=>$hint)
-		{
-		  // all hints for DEFAULT node are for writing
-		  // only changed ones, or unique ones, otherwise
-		      if( 
-                    ($this->name == 'DEFAULT')
-                  ||
-		            (isset($this->owner->defaultlink->hints[$hintname]) 
-		            &&
-		            $this->owner->defaultlink->hints[$hintname] != $hint)
-		          ||
-		            (!isset($this->owner->defaultlink->hints[$hintname]))
-		        )
-		      {		      
-                    $output .= "\tSET $hintname $hint\n";
-		      }
-		}
-
-		if ($output != '')
-		{
-			fwrite($fd, "LINK " . $this->name . "\n");
-			fwrite($fd, "$output\n");
-		}
+		return($output);
 	}
 
 	function asJS()
@@ -2373,7 +2560,7 @@ class WeatherMapLink extends WeatherMapItem
 		return $js;
 	}
 
-	function asJSON()
+	function asJSON($complete=TRUE)
 	{
 		$js='';
 		$js.="" . js_escape($this->name) . ": {";
@@ -2384,26 +2571,35 @@ class WeatherMapLink extends WeatherMapItem
 			$js.="b:'" . $this->b->name . "', ";
 		}
 
-		$js.="width:'" . $this->width . "', ";
-		$js.="target:";
+		if($complete)
+		{
+			$js.="infourl:" . js_escape($this->infourl) . ", ";
+			$js.="overliburl:" . js_escape($this->overliburl). ", ";
+			$js.="width:'" . $this->width . "', ";
+			$js.="target:";
+	
+			$tgt='';
+	
+			foreach ($this->targets as $target) { $tgt.=$target[4] . ' '; }
+	
+			$js.=js_escape(trim($tgt));
+			$js.=",";
+	
+			$js.="bw_in:" . js_escape($this->max_bandwidth_in_cfg) . ", ";
+			$js.="bw_out:" . js_escape($this->max_bandwidth_out_cfg) . ", ";
+	
+			$js.="name:" . js_escape($this->name) . ", ";
+			$js.="overlibwidth:'" . $this->overlibheight . "', ";
+			$js.="overlibheight:'" . $this->overlibwidth . "', ";
+			$js.="overlibcaption:" . js_escape($this->overlibcaption) . ", ";
+		}
+		$vias = "via: [";
+		foreach ($this->vialist as $via)
+				$vias .= sprintf("[%d,%d],", $via[0], $via[1]);
+		$vias .= "],";
+		$vias = str_replace("],]","]]",$vias);
+		$js .= $vias;
 
-		$tgt='';
-
-		foreach ($this->targets as $target) { $tgt.=$target[4] . ' '; }
-
-		$js.=js_escape(trim($tgt));
-		$js.=",";
-
-		$js.="bw_in:" . js_escape($this->max_bandwidth_in_cfg) . ", ";
-		$js.="bw_out:" . js_escape($this->max_bandwidth_out_cfg) . ", ";
-
-		$js.="name:" . js_escape($this->name) . ", ";
-		$js.="overlibwidth:'" . $this->overlibheight . "', ";
-		$js.="overlibheight:'" . $this->overlibwidth . "', ";
-		$js.="overlibcaption:" . js_escape($this->overlibcaption) . ", ";
-
-		$js.="infourl:" . js_escape($this->infourl) . ", ";
-		$js.="overliburl:" . js_escape($this->overliburl);
 		$js.="},\n";
 		return $js;
 	}
@@ -2441,7 +2637,7 @@ class WeatherMap extends WeatherMapBase
 	var $width,
 		$height;
 	var $keyx,
-		$keyy;
+		$keyy, $keyimage;
 	var $titlex,
 		$titley;
 	var $keytext,
@@ -2455,7 +2651,7 @@ class WeatherMap extends WeatherMapBase
 	var $rrdtool_check;
 	var $inherit_fieldlist;
 	var $context;
-	var $cachefolder,$mapcache;
+	var $cachefolder,$mapcache,$cachefile_version;
 	var $name;
 	var $black,
 		$white,
@@ -2491,6 +2687,7 @@ class WeatherMap extends WeatherMapBase
 				'keytext' => array('DEFAULT' => 'Traffic Load'),
 				'keyx' => array('DEFAULT' => -1),
 				'keyy' => array('DEFAULT' => -1),
+				'keyimage' => array(),
 				'keysize' => array('DEFAULT' => 400),
 				'stamptext' => 'Created: %b %d %Y %H:%M:%S',
 				'keyfont' => 4,
@@ -2581,15 +2778,15 @@ class WeatherMap extends WeatherMapBase
 		// if it's supposed to be a special font, and it hasn't been defined, then fall through
 		if ($fontnumber > 5 && !isset($this->fonts[$fontnumber]))
 		{
-			warn ("Using a non-existent special font ($fontnumber) - falling back to internal GD fonts\n");
-			if($angle != 0) warn("Angled text doesn't work with non-FreeType fonts\n");
+			warn ("Using a non-existent special font ($fontnumber) - falling back to internal GD fonts [WMWARN03]\n");
+			if($angle != 0) warn("Angled text doesn't work with non-FreeType fonts [WMWARN02]\n");
 			$fontnumber=5;
 		}
 
 		if (($fontnumber > 0) && ($fontnumber < 6))
 		{
 			imagestring($image, $fontnumber, $x, $y - imagefontheight($fontnumber), $string, $colour);
-			if($angle != 0) warn("Angled text doesn't work with non-FreeType fonts\n");
+			if($angle != 0) warn("Angled text doesn't work with non-FreeType fonts [WMWARN02]\n");
 		}
 		else
 		{
@@ -2605,7 +2802,7 @@ class WeatherMap extends WeatherMapBase
 				imagestring($image, $this->fonts[$fontnumber]->gdnumber,
 					$x,      $y - imagefontheight($this->fonts[$fontnumber]->gdnumber),
 					$string, $colour);
-				if($angle != 0) warn("Angled text doesn't work with non-FreeType fonts\n");
+				if($angle != 0) warn("Angled text doesn't work with non-FreeType fonts [WMWARN04]\n");
 			}
 		}
 	}
@@ -2704,7 +2901,7 @@ class WeatherMap extends WeatherMapBase
 
 				if(is_null($the_item))
 				{
-					warn("ProcessString: $key refers to unknown item\n");
+					warn("ProcessString: $key refers to unknown item [WMWARN05]\n");
 				}
 				else
 				{
@@ -2810,7 +3007,7 @@ function LoadPlugins( $type="data", $dir="lib/datasources" )
 	}
 	else
 	{
-		warn("Couldn't open $type Plugin directory ($dir). Things will probably go wrong.\n");
+		warn("Couldn't open $type Plugin directory ($dir). Things will probably go wrong. [WMWARN06]\n");
 	}
 }
 
@@ -2902,7 +3099,7 @@ function ReadData()
 										}
 										else
 										{
-											warn("ReadData: $type $name, target: $targetstring on config line $target[3] was recognised as a valid TARGET by a plugin that is unable to run ($ds_class)\n");
+											warn("ReadData: $type $name, target: $targetstring on config line $target[3] was recognised as a valid TARGET by a plugin that is unable to run ($ds_class) [WMWARN07]\n");
 										}
 										$matched = TRUE;
 										$matched_by = $ds_class;
@@ -2913,7 +3110,7 @@ function ReadData()
 							if(! $matched)
 							{
 								// **
-								warn("ReadData: $type $name, target: $target[4] on config line $target[3] was not recognised as a valid TARGET\n");
+								warn("ReadData: $type $name, target: $target[4] on config line $target[3] was not recognised as a valid TARGET [WMWARN08]\n");
 							}
 
 							if (($in < 0) || ($out < 0))
@@ -2943,8 +3140,8 @@ function ReadData()
 				$myobj->outpercent = (($total_out) / ($myobj->max_bandwidth_out)) * 100;
 				$myobj->inpercent = (($total_in) / ($myobj->max_bandwidth_in)) * 100;		
 			
-				list($incol,$inscalekey) = $this->ColourFromPercent($myobj->inpercent,$myobj->usescale,$myobj->name);
-				list($outcol,$outscalekey) = $this->ColourFromPercent($myobj->outpercent,$myobj->usescale,$myobj->name);
+				list($incol,$inscalekey) = $this->ColourFromPercent(NULL, $myobj->inpercent,$myobj->usescale,$myobj->name);
+				list($outcol,$outscalekey) = $this->ColourFromPercent(NULL, $myobj->outpercent,$myobj->usescale,$myobj->name);
 				
 				// $myobj->incolour = $incol;
 				$myobj->inscalekey = $inscalekey;
@@ -2960,7 +3157,7 @@ function ReadData()
 }
 
 // nodename is a vestigal parameter, from the days when nodes where just big labels
-function DrawLabel($im, $x, $y, $text, $font, $padding, $linkname, $textcolour, $bgcolour, $outlinecolour, &$map)
+function DrawLabel($im, $x, $y, $text, $font, $padding, $linkname, $textcolour, $bgcolour, $outlinecolour, &$map, $direction)
 {
 	list($strwidth, $strheight)=$this->myimagestringsize($font, $text);
 
@@ -2996,12 +3193,12 @@ function DrawLabel($im, $x, $y, $text, $font, $padding, $linkname, $textcolour, 
 	$textcol=myimagecolorallocate($im, $textcolour[0], $textcolour[1], $textcolour[2]);
 	$this->myimagestring($im, $font, $x - $strwidth / 2, $y + $strheight / 2 + 1, $text, $textcol);
 
-	$this->imap->addArea("Rectangle", "LINK:".$linkname, '', array($x1, $y1, $x2, $y2));
+	$this->imap->addArea("Rectangle", "LINK:".$linkname.':'.($direction+2), '', array($x1, $y1, $x2, $y2));
 
 }
 
 // nodename is a vestigal parameter, from the days when nodes where just big labels
-function DrawLabelRotated($im, $x, $y, $angle, $text, $font, $padding, $linkname, $textcolour, $bgcolour, $outlinecolour, &$map)
+function DrawLabelRotated($im, $x, $y, $angle, $text, $font, $padding, $linkname, $textcolour, $bgcolour, $outlinecolour, &$map, $direction)
 {
 	list($strwidth, $strheight)=$this->myimagestringsize($font, $text);
 
@@ -3053,11 +3250,13 @@ function DrawLabelRotated($im, $x, $y, $angle, $text, $font, $padding, $linkname
 	$textcol=myimagecolorallocate($im, $textcolour[0], $textcolour[1], $textcolour[2]);
 	$this->myimagestring($im, $font, $points[8], $points[9], $text, $textcol,$angle);
 
-	$this->imap->addArea("Rectangle", "LINK:".$linkname, '', array($x1, $y1, $x2, $y2));
+	$areaname = "LINK:".$linkname.':'.($direction+2);
+	$map->imap->addArea("Polygon", $areaname, '', $points);
+	debug ("Adding Poly imagemap for $areaname\n");
 
 }
 
-function ColourFromPercent($percent,$scalename="DEFAULT",$name="")
+function ColourFromPercent($image, $percent,$scalename="DEFAULT",$name="")
 {
 	$col = NULL;
 	
@@ -3076,7 +3275,7 @@ function ColourFromPercent($percent,$scalename="DEFAULT",$name="")
 			if (($percent >= $colour['bottom']) and ($percent <= $colour['top']))
 			{
 				// we get called early now, so might not need to actually allocate a colour
-				if(isset($this->image))
+				if(isset($image))
 				{
 					if (isset($colour['red2']))
 					{
@@ -3093,10 +3292,15 @@ function ColourFromPercent($percent,$scalename="DEFAULT",$name="")
 						$g=$colour["green1"] + ($colour["green2"] - $colour["green1"]) * $ratio;
 						$b=$colour["blue1"] + ($colour["blue2"] - $colour["blue1"]) * $ratio;
 	
-						$col = myimagecolorallocate($this->image, $r, $g, $b);
+						$col = myimagecolorallocate($image, $r, $g, $b);
 					}
 					else {
-						$col = $colour['gdref1'];
+						$r=$colour["red1"];
+						$g=$colour["green1"];
+						$b=$colour["blue1"];
+	
+						$col = myimagecolorallocate($image, $r, $g, $b);
+						# $col = $colour['gdref1'];
 					}
 				}
 				
@@ -3106,7 +3310,10 @@ function ColourFromPercent($percent,$scalename="DEFAULT",$name="")
 	}
 	else
 	{
-		warn("ColourFromPercent: Attempted to use non-existent scale: $scalename for $name\n");
+		if($scalename != 'none')
+		{
+			warn("ColourFromPercent: Attempted to use non-existent scale: $scalename for $name [WMWARN09]\n");
+		}
 	}
 
 	// you'll only get grey for a COMPLETELY quiet link if there's no 0 in the SCALE lines
@@ -3115,6 +3322,70 @@ function ColourFromPercent($percent,$scalename="DEFAULT",$name="")
 	// and you'll only get white for a link with no colour assigned
 	return array($this->white,'');
 }
+
+
+function NewColourFromPercent($percent,$scalename="DEFAULT",$name="")
+{
+	$col = new Colour(0,0,0);
+	
+	if(isset($this->colours[$scalename]))
+	{
+		$colours=$this->colours[$scalename];
+
+		if ($percent > 100)
+		{
+			warn ("NewColourFromPercent: Clipped $name $percent% to 100%\n");
+			$percent=100;
+		}
+
+		foreach ($colours as $key => $colour)
+		{
+			if (($percent >= $colour['bottom']) and ($percent <= $colour['top']))
+			{
+				if (isset($colour['red2']))
+				{
+					if($colour["bottom"] == $colour["top"])
+					{
+						$ratio = 0;
+					}
+					else
+					{
+						$ratio=($percent - $colour["bottom"]) / ($colour["top"] - $colour["bottom"]);
+					}
+
+					$r=$colour["red1"] + ($colour["red2"] - $colour["red1"]) * $ratio;
+					$g=$colour["green1"] + ($colour["green2"] - $colour["green1"]) * $ratio;
+					$b=$colour["blue1"] + ($colour["blue2"] - $colour["blue1"]) * $ratio;
+				}
+				else {
+					$r=$colour["red1"];
+					$g=$colour["green1"];
+					$b=$colour["blue1"];
+
+					# $col = new Colour($r, $g, $b);
+					# $col = $colour['gdref1'];
+				}
+				$col = new Colour($r, $g, $b);
+								
+				return(array($col,$key));
+			}
+		}
+	}
+	else
+	{
+		if($scalename != 'none')
+		{
+			warn("ColourFromPercent: Attempted to use non-existent scale: $scalename for $name [WMWARN09]\n");
+		}
+	}
+
+	// you'll only get grey for a COMPLETELY quiet link if there's no 0 in the SCALE lines
+	if ($percent == 0) { return array(new Colour(192,255,192),''); }
+
+	// and you'll only get white for a link with no colour assigned
+	return array(new Colour(255,255,255),'');
+}
+
 
 function coloursort($a, $b)
 {
@@ -3141,30 +3412,38 @@ function DrawLegend_Horizontal($im,$scalename="DEFAULT",$width=400)
 
 	$font=$this->keyfont;
 
-	$x=$this->keyx[$scalename];
-	$y=$this->keyy[$scalename];
+	# $x=$this->keyx[$scalename];
+	# $y=$this->keyy[$scalename];
+	$x = 0;
+	$y = 0;
 
 	# $width = 400;
 	$scalefactor = $width/100;
 
 	list($tilewidth, $tileheight)=$this->myimagestringsize($font, "100%");
 	$box_left = $x;
+	# $box_left = 0;
 	$scale_left = $box_left + 4 + $scalefactor/2;
 	$box_right = $scale_left + $width + $tilewidth + 4 + $scalefactor/2;
 	$scale_right = $scale_left + $width;
 
 	$box_top = $y;
+	# $box_top = 0;
 	$scale_top = $box_top + $tileheight + 6;
 	$scale_bottom = $scale_top + $tileheight * 1.5;
 	$box_bottom = $scale_bottom + $tileheight * 2 + 6;
 
-	imagefilledrectangle($im, $box_left, $box_top, $box_right, $box_bottom,
-		$this->colours['DEFAULT']['KEYBG']['gdref1']);
-	imagerectangle($im, $box_left, $box_top, $box_right, $box_bottom,
-		$this->colours['DEFAULT']['KEYTEXT']['gdref1']);
+	$scale_im = imagecreatetruecolor($box_right+1, $box_bottom+1);
+	$scale_ref = 'gdref_legend_'.$scalename;
+	$this->AllocateScaleColours($scale_im,$scale_ref);
 
-	$this->myimagestring($im, $font, $scale_left, $scale_bottom + $tileheight * 2 + 2 , $title,
-		$this->colours['DEFAULT']['KEYTEXT']['gdref1']);
+	imagefilledrectangle($scale_im, $box_left, $box_top, $box_right, $box_bottom,
+		$this->colours['DEFAULT']['KEYBG'][$scale_ref]);
+	imagerectangle($scale_im, $box_left, $box_top, $box_right, $box_bottom,
+		$this->colours['DEFAULT']['KEYTEXT'][$scale_ref]);
+
+	$this->myimagestring($scale_im, $font, $scale_left, $scale_bottom + $tileheight * 2 + 2 , $title,
+		$this->colours['DEFAULT']['KEYTEXT'][$scale_ref]);
 
 	for($p=0;$p<=100;$p++)
 	{
@@ -3172,23 +3451,25 @@ function DrawLegend_Horizontal($im,$scalename="DEFAULT",$width=400)
 
 		if( ($p % 25) == 0)
 		{
-			imageline($im, $scale_left + $dx, $scale_top - $tileheight,
+			imageline($scale_im, $scale_left + $dx, $scale_top - $tileheight,
 				$scale_left + $dx, $scale_bottom + $tileheight,
-				$this->colours['DEFAULT']['KEYTEXT']['gdref1']);
+				$this->colours['DEFAULT']['KEYTEXT'][$scale_ref]);
 			$labelstring=sprintf("%d%%", $p);
-			$this->myimagestring($im, $font, $scale_left + $dx + 2, $scale_top - 2, $labelstring,
-				$this->colours['DEFAULT']['KEYTEXT']['gdref1']);
+			$this->myimagestring($scale_im, $font, $scale_left + $dx + 2, $scale_top - 2, $labelstring,
+				$this->colours['DEFAULT']['KEYTEXT'][$scale_ref]);
 		}
 
-		list($col,$junk) = $this->ColourFromPercent($p,$scalename);
-		imagefilledrectangle($im, $scale_left + $dx - $scalefactor/2, $scale_top,
+		list($col,$junk) = $this->ColourFromPercent($scale_im, $p,$scalename);
+		imagefilledrectangle($scale_im, $scale_left + $dx - $scalefactor/2, $scale_top,
 			$scale_left + $dx + $scalefactor/2, $scale_bottom,
 			$col);
 	}
 
+	imagecopy($im,$scale_im,$this->keyx[$scalename],$this->keyy[$scalename],0,0,imagesx($scale_im),imagesy($scale_im));
+	$this->keyimage[$scalename] = $scale_im;
+
 	$this->imap->addArea("Rectangle", "LEGEND:$scalename", '',
 		array($box_left, $box_top, $box_right, $box_bottom));
-
 }
 
 function DrawLegend_Vertical($im,$scalename="DEFAULT",$height=400)
@@ -3210,8 +3491,10 @@ function DrawLegend_Vertical($im,$scalename="DEFAULT",$height=400)
 
 	list($tilewidth, $tileheight)=$this->myimagestringsize($font, "100%");
 
-	$box_left = $x;
-	$box_top = $y;
+	# $box_left = $x;
+	# $box_top = $y;
+	$box_left = 0;
+	$box_top = 0;
 
 	$scale_left = $box_left+$scalefactor*2 +4 ;
 	$scale_right = $scale_left + $tileheight*2;
@@ -3227,12 +3510,16 @@ function DrawLegend_Vertical($im,$scalename="DEFAULT",$height=400)
 	$scale_bottom = $scale_top + $height;
 	$box_bottom = $scale_bottom + $scalefactor + $tileheight/2 + 4;
 
-	imagefilledrectangle($im, $box_left, $box_top, $box_right, $box_bottom,
+	$scale_im = imagecreatetruecolor($box_right+1, $box_bottom+1);
+	$scale_ref = 'gdref_legend_'.$scalename;
+	$this->AllocateScaleColours($scale_im,$scale_ref);
+
+	imagefilledrectangle($scale_im, $box_left, $box_top, $box_right, $box_bottom,
 		$this->colours['DEFAULT']['KEYBG']['gdref1']);
-	imagerectangle($im, $box_left, $box_top, $box_right, $box_bottom,
+	imagerectangle($scale_im, $box_left, $box_top, $box_right, $box_bottom,
 		$this->colours['DEFAULT']['KEYTEXT']['gdref1']);
 
-	$this->myimagestring($im, $font, $scale_left-$scalefactor, $scale_top - $tileheight , $title,
+	$this->myimagestring($scale_im, $font, $scale_left-$scalefactor, $scale_top - $tileheight , $title,
 		$this->colours['DEFAULT']['KEYTEXT']['gdref1']);
 
 	for($p=0;$p<=100;$p++)
@@ -3242,19 +3529,22 @@ function DrawLegend_Vertical($im,$scalename="DEFAULT",$height=400)
 
 		if( ($p % 25) == 0)
 		{
-			imageline($im, $scale_left - $scalefactor, $scale_top + $dy,
+			imageline($scale_im, $scale_left - $scalefactor, $scale_top + $dy,
 				$scale_right + $scalefactor, $scale_top + $dy,
-				$this->colours['DEFAULT']['KEYTEXT']['gdref1']);
+				$this->colours['DEFAULT']['KEYTEXT'][$scale_ref]);
 			$labelstring=sprintf("%d%%", $p);
-			$this->myimagestring($im, $font, $scale_right + $scalefactor*2 , $scale_top + $dy + $tileheight/2,
-				$labelstring,  $this->colours['DEFAULT']['KEYTEXT']['gdref1']);
+			$this->myimagestring($scale_im, $font, $scale_right + $scalefactor*2 , $scale_top + $dy + $tileheight/2,
+				$labelstring,  $this->colours['DEFAULT']['KEYTEXT'][$scale_ref]);
 		}
 
-		list($col,$junk) = $this->ColourFromPercent($p,$scalename);
-		imagefilledrectangle($im, $scale_left, $scale_top + $dy - $scalefactor/2,
+		list($col,$junk) = $this->ColourFromPercent($scale_im, $p,$scalename);
+		imagefilledrectangle($scale_im, $scale_left, $scale_top + $dy - $scalefactor/2,
 			$scale_right, $scale_top + $dy + $scalefactor/2,
 			$col);
 	}
+
+	imagecopy($im,$scale_im,$this->keyx[$scalename],$this->keyy[$scalename],0,0,imagesx($scale_im),imagesy($scale_im));
+	$this->keyimage[$scalename] = $scale_im;
 
 	$this->imap->addArea("Rectangle", "LEGEND:$scalename", '',
 		array($box_left, $box_top, $box_right, $box_bottom));
@@ -3272,9 +3562,12 @@ function DrawLegend_Classic($im,$scalename="DEFAULT")
 	$hide_zero = intval($this->get_hint("key_hidezero_".$scalename));
 	$hide_percent = intval($this->get_hint("key_hidepercent_".$scalename));
 
+	// did we actually hide anything?
+	$hid_zero = FALSE;
 	if( ($hide_zero == 1) && isset($colours['0_0']) )
 	{
 		$nscales--;
+		$hid_zero = TRUE;
 	}
 
 	$font=$this->keyfont;
@@ -3286,7 +3579,7 @@ function DrawLegend_Classic($im,$scalename="DEFAULT")
 	$tileheight=$tileheight * 1.1;
 	$tilespacing=$tileheight + 2;
 
-	if (($x >= 0) && ($y >= 0))
+	if (($this->keyx[$scalename] >= 0) && ($this->keyy[$scalename] >= 0))
 	{
 
 		# $minwidth = imagefontwidth($font) * strlen('XX 100%-100%')+10;
@@ -3301,20 +3594,25 @@ function DrawLegend_Classic($im,$scalename="DEFAULT")
 
 		$boxheight=$tilespacing * ($nscales + 1) + 10;
 
-		$boxx=$x;
-		$boxy=$y;
-
+		$boxx=$x; $boxy=$y;
+		$boxx=0;
+		$boxy=0;
+		
 		// allow for X11-style negative positioning
 		if ($boxx < 0) { $boxx+=$this->width; }
 
 		if ($boxy < 0) { $boxy+=$this->height; }
 
-		imagefilledrectangle($im, $boxx, $boxy, $boxx + $boxwidth, $boxy + $boxheight,
-			$this->colours['DEFAULT']['KEYBG']['gdref1']);
-		imagerectangle($im, $boxx, $boxy, $boxx + $boxwidth, $boxy + $boxheight,
-			$this->colours['DEFAULT']['KEYTEXT']['gdref1']);
-		$this->myimagestring($im, $font, $boxx + 4, $boxy + 4 + $tileheight, $title,
-			$this->colours['DEFAULT']['KEYTEXT']['gdref1']);
+		$scale_im = imagecreatetruecolor($boxwidth+1, $boxheight+1);
+		$scale_ref = 'gdref_legend_'.$scalename;
+		$this->AllocateScaleColours($scale_im,$scale_ref);
+
+		imagefilledrectangle($scale_im, $boxx, $boxy, $boxx + $boxwidth, $boxy + $boxheight,
+			$this->colours['DEFAULT']['KEYBG'][$scale_ref]);
+		imagerectangle($scale_im, $boxx, $boxy, $boxx + $boxwidth, $boxy + $boxheight,
+			$this->colours['DEFAULT']['KEYTEXT'][$scale_ref]);
+		$this->myimagestring($scale_im, $font, $boxx + 4, $boxy + 4 + $tileheight, $title,
+			$this->colours['DEFAULT']['KEYTEXT'][$scale_ref]);
 
 		usort($colours, array("Weathermap", "coloursort"));
 
@@ -3330,14 +3628,23 @@ function DrawLegend_Classic($im,$scalename="DEFAULT")
 					$y=$boxy + $tilespacing * $i + 8;
 					$x=$boxx + 6;
 	
+					$fudgefactor = 0;
+					if( $hid_zero && $colour['bottom']==0 )
+					{
+						// calculate a small offset that can be added, which will hide the zero-value in a
+						// gradient, but not make the scale incorrect. A quarter of a pixel should do it.
+						$fudgefactor = ($colour['top'] - $colour['bottom'])/($tilewidth*4);
+						# warn("FUDGING $fudgefactor\n");
+					}					
+	
 					if (isset($colour['red2']))
 					{
 						for ($n=0; $n <= $tilewidth; $n++)
 						{
 							$percent
-								=$colour['bottom'] + ($n / $tilewidth) * ($colour['top'] - $colour['bottom']);
-							list($col,$junk) = $this->ColourFromPercent($percent,$scalename);
-							imagefilledrectangle($im, $x + $n, $y, $x + $n, $y + $tileheight,
+								=  $fudgefactor + $colour['bottom'] + ($n / $tilewidth) * ($colour['top'] - $colour['bottom']);
+							list($col,$junk) = $this->ColourFromPercent($scale_im, $percent,$scalename);
+							imagefilledrectangle($scale_im, $x + $n, $y, $x + $n, $y + $tileheight,
 								$col);
 						}
 					}
@@ -3345,22 +3652,25 @@ function DrawLegend_Classic($im,$scalename="DEFAULT")
 					{
 						// pick a percentage in the middle...
 						$percent=($colour['bottom'] + $colour['top']) / 2;
-						list($col,$junk) = $this->ColourFromPercent($percent,$scalename);
-						imagefilledrectangle($im, $x, $y, $x + $tilewidth, $y + $tileheight,
+						list($col,$junk) = $this->ColourFromPercent($scale_im, $percent,$scalename);
+						imagefilledrectangle($scale_im, $x, $y, $x + $tilewidth, $y + $tileheight,
 							$col);
 					}
 	
 					$labelstring=sprintf("%s-%s", $colour['bottom'], $colour['top']);
 					if($hide_percent==0) { $labelstring.="%"; }
-					$this->myimagestring($im, $font, $x + 4 + $tilewidth, $y + $tileheight, $labelstring,
-						$this->colours['DEFAULT']['KEYTEXT']['gdref1']);
+					$this->myimagestring($scale_im, $font, $x + 4 + $tilewidth, $y + $tileheight, $labelstring,
+						$this->colours['DEFAULT']['KEYTEXT'][$scale_ref]);
 					$i++;
 				}
+				imagecopy($im,$scale_im,$this->keyx[$scalename],$this->keyy[$scalename],0,0,imagesx($scale_im),imagesy($scale_im));
+				$this->keyimage[$scalename] = $scale_im;
+
 			}
 		}
 
 		$this->imap->addArea("Rectangle", "LEGEND:$scalename", '',
-			array($boxx, $boxy, $boxx + $boxwidth, $boxy + $boxheight));
+			array($this->keyx[$scalename], $this->keyy[$scalename], $this->keyx[$scalename] + $boxwidth, $this->keyy[$scalename] + $boxheight));
 		# $this->imap->setProp("href","#","LEGEND");
 		# $this->imap->setProp("extrahtml","onclick=\"position_legend();\"","LEGEND");
 
@@ -3476,7 +3786,7 @@ function ReadConfig($filename)
 								debug ("Saving Link: " . $curlink->name . "\n");
 							}
 							else { warn
-								("Dropping LINK " . $curlink->name . " - it hasn't got 2 NODES!\n"); }
+								("Dropping LINK " . $curlink->name . " - it hasn't got 2 NODES! [WMWARN28]\n"); }
 						}
 					}
 
@@ -3485,7 +3795,7 @@ function ReadConfig($filename)
 						if ($matches[2] == 'DEFAULT')
 						{
 							if ($linksseen > 0) { warn
-								("LINK DEFAULT is not the first LINK. Defaults will not apply to earlier LINKs.\n");
+								("LINK DEFAULT is not the first LINK. Defaults will not apply to earlier LINKs. [WMWARN26]\n");
 							}
 							unset($curlink);
 							$curlink = $this->defaultlink;
@@ -3493,6 +3803,12 @@ function ReadConfig($filename)
 						else
 						{
 							unset($curlink);
+							
+							if(isset($this->links[$matches[2]]))
+							{
+								warn("Duplicate link name ".$matches[2]." at line $linecount - only the last one defined is used. [WMWARN25]\n");
+							}
+							
 							$curlink=new WeatherMapLink;
 							$curlink->name=$matches[2];
 							$curlink->Reset($this);
@@ -3509,7 +3825,7 @@ function ReadConfig($filename)
 						if ($matches[2] == 'DEFAULT')
 						{
 							if ($nodesseen > 0) { warn
-								("NODE DEFAULT is not the first NODE. Defaults will not apply to earlier NODEs.\n");
+								("NODE DEFAULT is not the first NODE. Defaults will not apply to earlier NODEs. [WMWARN27]\n");
 							}
 
 							unset($curnode);
@@ -3518,6 +3834,12 @@ function ReadConfig($filename)
 						else
 						{
 							unset($curnode);
+							
+							if(isset($this->nodes[$matches[2]]))
+							{
+								warn("Duplicate node name ".$matches[2]." at line $linecount - only the last one defined is used. [WMWARN24]\n");
+							}
+							
 							$curnode=new WeatherMapNode;
 							$curnode->name=$matches[2];
 							$curnode->Reset($this);
@@ -3717,8 +4039,19 @@ function ReadConfig($filename)
 				{
 					if ($last_seen == 'NODE')
 					{
-						$curnode->iconfile=$matches[3];
-						$this->used_images[] = $matches[3];
+						// allow some special names - these produce "artificial" icons
+						if($matches[3]=='nink' || $matches[3]=='box' || $matches[3]=='round' || $matches[3]=='inpie' || $matches[3]=='outpie' )
+						{
+							// special icons aren't added to used_images, so they won't appear in picklist for editor
+							// (the editor doesn't do icon scaling, and these *require* a scale)
+							$curnode->iconfile=$matches[3];
+							$this->used_images[] = $matches[3];						
+						}
+						else
+						{						
+							$curnode->iconfile=$matches[3];
+							$this->used_images[] = $matches[3];						
+						}
 						$curnode->iconscalew = $matches[1];
 						$curnode->iconscaleh = $matches[2];
 						$linematched++;
@@ -4003,10 +4336,10 @@ function ReadConfig($filename)
 							$this->fonts[$matches[1]]->size=$matches[3];
 						}
 						else { warn
-							("Failed to load ttf font " . $matches[2] . " - at config line $linecount\n"); }
+							("Failed to load ttf font " . $matches[2] . " - at config line $linecount\n [WMWARN30]"); }
 					}
 					else { warn
-						("imagettfbbox() is not a defined function. You don't seem to have FreeType compiled into your gd module.\n");
+						("imagettfbbox() is not a defined function. You don't seem to have FreeType compiled into your gd module. [WMWARN31]\n");
 					}
 
 					$linematched++;
@@ -4024,7 +4357,7 @@ function ReadConfig($filename)
 						$this->fonts[$matches[1]]->gdnumber=$newfont;
 					}
 					else { warn ("Failed to load GD font: " . $matches[2]
-						. " ($newfont) at config line $linecount\n"); }
+						. " ($newfont) at config line $linecount [WMWARN32]\n"); }
 
 					$linematched++;
 				}
@@ -4243,12 +4576,14 @@ function ReadConfig($filename)
 				if (preg_match("/^\s*HTMLOUTPUTFILE\s+(.*)\s*$/i", $buffer, $matches))
 				{
 					$this->htmloutputfile=trim($matches[1]);
+					debug("SET HTMLOUTPUTFILE to $matches[1]\n");
 					$linematched++;
 				}
 
 				if (preg_match("/^\s*IMAGEOUTPUTFILE\s+(.*)\s*$/i", $buffer, $matches))
 				{
 					$this->imageoutputfile=trim($matches[1]);
+					debug("SET IMAGEOUTPUTFILE to $matches[1]\n");
 					$linematched++;
 				}
 
@@ -4367,7 +4702,7 @@ function ReadConfig($filename)
 				}
 				else
 				{
-					warn("NODE ".$node->name." has a relative position to an unknown node!\n");
+					warn("NODE ".$node->name." has a relative position to an unknown node! [WMWARN10]\n");
 				}
 			}
 		}
@@ -4377,7 +4712,7 @@ function ReadConfig($filename)
 	
 	if($skipped>0)	
 	{ 
-		warn("There are Circular dependencies in relative POSITION lines for $skipped nodes.\n");
+		warn("There are Circular dependencies in relative POSITION lines for $skipped nodes. [WMWARN11]\n");
 	}
 
 	# warn("---\n\nDEFAULT NODE AGAIN::".var_dump($this->defaultnode->hints)."::\n");
@@ -4470,12 +4805,18 @@ function WriteConfig($filename)
 		foreach ($this->colours as $scalename=>$colours)
 		{
 		  // not all keys will have keypos but if they do, then all three vars should be defined
-		if ( (isset($this->keyx[$scalename]))
-			|| ($this->keytext[$scalename] != $this->inherit_fieldlist['keytext'])
+		if ( (isset($this->keyx[$scalename])) && (isset($this->keyy[$scalename])) && (isset($this->keytext[$scalename]))
+		    && (($this->keytext[$scalename] != $this->inherit_fieldlist['keytext'])
 			|| ($this->keyx[$scalename] != $this->inherit_fieldlist['keyx'])
-			|| ($this->keyy[$scalename] != $this->inherit_fieldlist['keyy']))
-				$output.="KEYPOS " . $scalename." ". $this->keyx[$scalename] . " " . $this->keyy[$scalename] . " " . $this->keytext[$scalename] . "\n";
+			|| ($this->keyy[$scalename] != $this->inherit_fieldlist['keyy'])))
+			{
+			     // sometimes a scale exists but without defaults. A proper scale object would sort this out...
+			     if($this->keyx[$scalename] == '') { $this->keyx[$scalename] = -1; }
+			     if($this->keyy[$scalename] == '') { $this->keyy[$scalename] = -1; }
 
+				$output.="KEYPOS " . $scalename." ". $this->keyx[$scalename] . " " . $this->keyy[$scalename] . " " . $this->keytext[$scalename] . "\n";
+            }
+            
 		if ( (isset($this->keystyle[$scalename])) &&  ($this->keystyle[$scalename] != $this->inherit_fieldlist['keystyle']['DEFAULT']) )
 		{
 			$extra='';
@@ -4520,16 +4861,22 @@ function WriteConfig($filename)
 
 		fwrite($fd, $output);
 
-		$this->defaultnode->WriteConfig($fd);
-		$this->defaultlink->WriteConfig($fd);
+		fwrite($fd,$this->defaultnode->WriteConfig());
+		fwrite($fd,$this->defaultlink->WriteConfig());
 
 		fwrite($fd, "\n# End of DEFAULTS section\n\n# Node definitions:\n");
 
-		foreach ($this->nodes as $node) { $node->WriteConfig($fd); }
+		foreach ($this->nodes as $node)
+		{
+			fwrite($fd,$node->WriteConfig());
+		}
 
 		fwrite($fd, "\n# End of NODE section\n\n# Link definitions:\n");
 
-		foreach ($this->links as $link) { $link->WriteConfig($fd); }
+		foreach ($this->links as $link)
+		{
+			fwrite($fd,$link->WriteConfig());
+		}
 
 		fwrite($fd, "\n# End of LINK section\n\n# That's All Folks!\n");
 	}
@@ -4546,7 +4893,7 @@ function WriteConfig($filename)
 // this way, it's the pretty icons that suffer if there aren't enough colours, and
 // not the actual useful data
 // we skip any gradient scales
-function AllocateScaleColours($im)
+function AllocateScaleColours($im,$refname='gdref1')
 {
 	# $colours=$this->colours['DEFAULT'];
 	foreach ($this->colours as $scalename=>$colours)
@@ -4559,7 +4906,7 @@ function AllocateScaleColours($im)
 				$g=$colour['green1'];
 				$b=$colour['blue1'];
 				debug ("AllocateScaleColours: $scalename $key ($r,$g,$b)\n");
-				$this->colours[$scalename][$key]['gdref1']=myimagecolorallocate($im, $r, $g, $b);
+				$this->colours[$scalename][$key][$refname]=myimagecolorallocate($im, $r, $g, $b);
 			}
 		}
 	}
@@ -4568,6 +4915,7 @@ function AllocateScaleColours($im)
 function DrawMap($filename = '', $thumbnailfile = '', $thumbnailmax = 250, $withnodes = TRUE)
 {
 	$bgimage=NULL;
+	$this->cachefile_version = crc32(file_get_contents($this->configfile));
 
 	debug("Running Post-Processing Plugins...\n");
 	foreach ($this->postprocessclasses as $post_class)
@@ -4648,7 +4996,7 @@ function DrawMap($filename = '', $thumbnailfile = '', $thumbnailmax = 250, $with
 			# debug("DEFAULT: ".var_dump($this->defaultnode->notes)."\n");
 		}
 
-        foreach ($this->colours as $scalename=>$colours)
+		  foreach ($this->colours as $scalename=>$colours)
 		{
 			debug("Drawing KEY for $scalename if necessary.\n");
 
@@ -4679,22 +5027,22 @@ function DrawMap($filename = '', $thumbnailfile = '', $thumbnailmax = 250, $with
 				$functions = TRUE;
 				if(function_exists('imagejpeg') && preg_match("/\.jpg/i",$filename))
 				{
-					debug("Writing JPEG file\n");
+					debug("Writing JPEG file to $filename\n");
 					$result = imagejpeg($image, $filename);
 				}
 				elseif(function_exists('imagegif') && preg_match("/\.gif/i",$filename))
 				{
-					debug("Writing GIF file\n");
+					debug("Writing GIF file to $filename\n");
 					$result = imagegif($image, $filename);
 				}
 				elseif(function_exists('imagepng') && preg_match("/\.png/i",$filename))
 				{
-					debug("Writing PNG file\n");
+					debug("Writing PNG file to $filename\n");
 					$result = imagepng($image, $filename);
 				}
 				else
 				{
-					warn("Failed to write map image. No function existed for the image format you requested.\n");
+					warn("Failed to write map image. No function existed for the image format you requested. [WMWARN12]\n");
 					$functions = FALSE;
 				}
 				
@@ -4702,11 +5050,11 @@ function DrawMap($filename = '', $thumbnailfile = '', $thumbnailmax = 250, $with
 				{
 					if(file_exists($filename))
 					{
-						warn("Failed to overwrite existing image file $filename - permissions of existing file are wrong?");
+						warn("Failed to overwrite existing image file $filename - permissions of existing file are wrong? [WMWARN13]");
 					}
 					else
 					{
-						warn("Failed to create image file $filename - permissions of output directory are wrong?");
+						warn("Failed to create image file $filename - permissions of output directory are wrong? [WMWARN14]");
 					}
 				}
 			}
@@ -4714,9 +5062,9 @@ function DrawMap($filename = '', $thumbnailfile = '', $thumbnailmax = 250, $with
 
 		if($this->context == 'editor2')
 		{
-			$cachefile = $this->cachefolder.DIRECTORY_SEPARATOR.dechex(crc32($this->configfile))."_bg.png";
+			$cachefile = $this->cachefolder.DIRECTORY_SEPARATOR.dechex(crc32($this->configfile))."_bg.".$this->cachefile_version.".png";
 			imagepng($image, $cachefile);
-			$cacheuri = $this->cachefolder.'/'.dechex(crc32($this->configfile))."_bg.png";
+			$cacheuri = $this->cachefolder.'/'.dechex(crc32($this->configfile))."_bg.".$this->cachefile_version.".png";
 			$this->mapcache = $cacheuri;
 		}
 
@@ -4742,18 +5090,18 @@ function DrawMap($filename = '', $thumbnailfile = '', $thumbnailmax = 250, $with
 				{
 					if(file_exists($filename))
 					{
-						warn("Failed to overwrite existing image file $filename - permissions of existing file are wrong?");
+						warn("Failed to overwrite existing image file $filename - permissions of existing file are wrong? [WMWARN15]");
 					}
 					else
 					{
-						warn("Failed to create image file $filename - permissions of output directory are wrong?");
+						warn("Failed to create image file $filename - permissions of output directory are wrong? [WMWARN16]");
 					}
 				}
 			}
 		}
 		else
 		{
-			warn("Skipping thumbnail creation, since we don't have the necessary function.");
+			warn("Skipping thumbnail creation, since we don't have the necessary function. [WMWARN17]");
 		}
 		imagedestroy ($image);
 	}
@@ -4782,11 +5130,18 @@ function PreloadMapHTML()
 			if ( ($link->overliburl != '') || ($link->notestext != '') )
 			{
 				# $overlibhtml = "onmouseover=\"return overlib('&lt;img src=".$link->overliburl."&gt;',DELAY,250,CAPTION,'".$link->name."');\"  onmouseout=\"return nd();\"";
-				$a_x=$link->a->x;
-				$b_x=$link->b->x;
+				#  $a_x=$link->a->x;
+				# $b_x=$link->b->x;
+				# $a_y=$link->a->y;
+				# $b_y=$link->b->y;
+				
+				$a_x=$this->nodes[$link->a->name]->x;
+				$a_y=$this->nodes[$link->a->name]->y;
+			 
+				$b_x=$this->nodes[$link->b->name]->x;
+				$b_y=$this->nodes[$link->b->name]->y;
+				
 				$mid_x=($a_x + $b_x) / 2;
-				$a_y=$link->a->y;
-				$b_y=$link->b->y;
 				$mid_y=($a_y + $b_y) / 2;
 
 				# debug($link->overlibwidth."---".$link->overlibheight."---\n");
@@ -4831,7 +5186,10 @@ function PreloadMapHTML()
 				$overlibhtml .= "',DELAY,250,${left}${above}CAPTION,'" . $caption
 				. "');\"  onmouseout=\"return nd();\"";
 
-				$this->imap->setProp("extrahtml", $overlibhtml, "LINK:" . $link->name);
+				for($i=0; $i<4; $i++)
+				{
+					$this->imap->setProp("extrahtml", $overlibhtml, "LINK:" . $link->name.":$i");
+				}
 			}
 		}
 
@@ -4885,7 +5243,10 @@ function PreloadMapHTML()
 
 				# $overlibhtml .= " onclick=\"return overlib('Some Test or other',CAPTION,'MENU',)\"";
 
-				$this->imap->setProp("extrahtml", $overlibhtml, "NODE:" . $node->name);
+				for($i=0; $i<4; $i++)
+				{
+					$this->imap->setProp("extrahtml", $overlibhtml, "NODE:" . $node->name.":$i");
+				}
 			}
 		}
 	}
@@ -4907,14 +5268,24 @@ function PreloadMapHTML()
 	{
 		foreach ($this->links as $link)
 		{
-			if ($link->infourl != '') { $this->imap->setProp("href", $this->ProcessString($link->infourl,$link),
-				"LINK:" . $link->name); }
+			if ($link->infourl != '') {
+				for($i=0; $i<4; $i++)
+				{
+					$areaname = "LINK:" . $link->name . ":$i";
+					$this->imap->setProp("href", $this->ProcessString($link->infourl,$link), $areaname);
+				}
+			}
 		}
 
 		foreach ($this->nodes as $node)
-		{
-			if ($node->infourl != '') { $this->imap->setProp("href", $this->ProcessString($node->infourl,$node),
-				"NODE:" . $node->name); }
+		{			
+			if ($node->infourl != '') {
+				for($i=0; $i<4; $i++)
+				{
+					$areaname = "NODE:" . $node->name . ":$i";
+					$this->imap->setProp("href", $this->ProcessString($node->infourl,$node), $areaname);
+				}
+			}
 		}
 	}
 }
@@ -5056,6 +5427,14 @@ function CacheUpdate($agelimit=600)
 				imagepng($node->image,$cachefolder.DIRECTORY_SEPARATOR.$nodefile);
 			}
 		}
+		
+		foreach ($this->keyimage as $key=>$image)
+		{
+				$scalefile = $cacheprefix."_scale_".dechex(crc32($key)).".png";
+				$this->keycache[$key] = $scalefile;
+				imagepng($image,$cachefolder.DIRECTORY_SEPARATOR.$scalefile);
+		}
+
 
 		$json = "";
 		$fd = fopen($cachefolder.DIRECTORY_SEPARATOR.$cacheprefix."_map.json","w");
@@ -5068,20 +5447,44 @@ function CacheUpdate($agelimit=600)
 		$json = rtrim($json,", \n");
 		fputs($fd,$json);
 		fclose($fd);
+		
+		
 
 		$fd = fopen($cachefolder.DIRECTORY_SEPARATOR.$cacheprefix."_nodes.json","w");
-		$json = $this->defaultnode->asJSON();
-		foreach ($this->nodes as $node) { $json .= $node->asJSON(); }
+		$json = $this->defaultnode->asJSON(TRUE);
+		foreach ($this->nodes as $node) { $json .= $node->asJSON(TRUE); }
 		$json = rtrim($json,", \n");
 		fputs($fd,$json);
 		fclose($fd);
 
-		$fd = fopen($cachefolder.DIRECTORY_SEPARATOR.$cacheprefix."_links.json","w");
-		$json = $this->defaultlink->asJSON();
-		foreach ($this->links as $link) { $json .= $link->asJSON(); }
+		$fd = fopen($cachefolder.DIRECTORY_SEPARATOR.$cacheprefix."_nodes_lite.json","w");
+		$json = $this->defaultnode->asJSON(FALSE);
+		foreach ($this->nodes as $node) { $json .= $node->asJSON(FALSE); }
 		$json = rtrim($json,", \n");
 		fputs($fd,$json);
 		fclose($fd);
+		
+		
+
+		$fd = fopen($cachefolder.DIRECTORY_SEPARATOR.$cacheprefix."_links.json","w");
+		$json = $this->defaultlink->asJSON(TRUE);
+		foreach ($this->links as $link) { $json .= $link->asJSON(TRUE); }
+		$json = rtrim($json,", \n");
+		fputs($fd,$json);
+		fclose($fd);
+
+		$fd = fopen($cachefolder.DIRECTORY_SEPARATOR.$cacheprefix."_links_lite.json","w");
+		$json = $this->defaultlink->asJSON(FALSE);
+		foreach ($this->links as $link) { $json .= $link->asJSON(FALSE); }
+		$json = rtrim($json,", \n");
+		fputs($fd,$json);
+		fclose($fd);
+		
+		$fd = fopen($cachefolder.DIRECTORY_SEPARATOR.$cacheprefix."_imaphtml.json","w");
+		$json = $this->imap->subHTML("LINK:");
+		fputs($fd,$json);
+		fclose($fd);
+		
 
 		$fd = fopen($cachefolder.DIRECTORY_SEPARATOR.$cacheprefix."_imap.json","w");
 		$json = '';

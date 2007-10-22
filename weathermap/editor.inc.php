@@ -1,7 +1,10 @@
 <?php
 function show_editor_startpage()
 {
-	global $mapdir, $WEATHERMAP_VERSION, $config_loaded, $cacti_found, $ignore_cacti;
+	global $mapdir, $WEATHERMAP_VERSION, $config_loaded, $cacti_found, $ignore_cacti,$configerror;
+
+	$fromplug = FALSE;
+        if(isset($_REQUEST['plug']) && (intval($_REQUEST['plug'])==1) ) { $fromplug = TRUE; }
 
 	$matches=0;
 
@@ -14,6 +17,11 @@ function show_editor_startpage()
 	print 'If it\'s a major issue for you, please feel free to complain. It\'s mainly laziness as I said, and there could be a fallback (not so smooth) mode for non-javascript browsers if it was seen to be worthwhile (I would take a bit of convincing, because I don\'t see a benefit, personally).</div>';
 	
 	$errormessage = "";
+
+    if($configerror!='')
+    {
+        $errormessage .= $configerror.'<p>';
+    }
 		
 	if(! $cacti_found && !$ignore_cacti)
 	{
@@ -29,10 +37,9 @@ function show_editor_startpage()
 	print '<div id="withjs">';
 	print '<div id="dlgStart" class="dlgProperties" ><div class="dlgTitlebar">Welcome</div><div class="dlgBody">';
 	print 'Welcome to the PHP Weathermap '.$WEATHERMAP_VERSION.' editor.<p>';
-	print '<div style="border: 3px dashed red; background: #055; padding: 5px; font-size: 97%;"><b>NOTE:</b> This editor is not finished! There are many features of ';
+	print '<div style="border: 3px dashed red; background: #055; padding: 5px; font-size: 90%;"><b>NOTE:</b> This editor is not finished! There are many features of ';
 	print 'Weathermap that you will be missing out on if you choose to use the editor only.';
 	print 'These include: curves, node offsets, font definitions, colour changing, per-node/per-link settings and image uploading. You CAN use the editor without damaging these features if you added them by hand, however.</div><p>';
-	
 	
 	print 'Do you want to:<p>';
 	print 'Create A New Map:<br>';
@@ -40,12 +47,15 @@ function show_editor_startpage()
 	print 'Named: <input type="text" name="mapname" size="20">';
 
 	print '<input name="action" type="hidden" value="newmap">';
+	print '<input name="plug" type="hidden" value="'.$fromplug.'">';
+
 	print '<input type="submit" value="Create">';
 	print '</form>';
-	print 'OR<br />';
-	print 'Open An Existing Map (looking in ' . $mapdir . '):<ul class="filelist">';
+
 
 	$titles = array();
+
+	$errorstring="";
 
 	if (is_dir($mapdir))
 	{
@@ -57,10 +67,14 @@ function show_editor_startpage()
 			while ($file=readdir($dh))
 			{
 				$realfile=$mapdir . DIRECTORY_SEPARATOR . $file;
+				$note = "";
 
-// if(is_file($realfile) && ( preg_match('/\.conf$/',$file) ))
 				if ( (is_file($realfile)) && (is_readable($realfile)) )
 				{
+					if(!is_writable($realfile))
+					{
+						$note .= "(read-only)";
+					}
 					$title='(no title)';
 					$fd=fopen($realfile, "r");
 					if($fd)
@@ -74,7 +88,7 @@ function show_editor_startpage()
 	
 						fclose ($fd);
 						$titles[$file] = $title;
-						# print "<li><a href=\"?mapname=$file\">$file</a> - <span class=\"comment\">$title</span></li>\n";
+						$notes[$file] = $note;
 						$n++;
 					}
 				}
@@ -82,21 +96,58 @@ function show_editor_startpage()
 
 			closedir ($dh);
 		}
-		else { print "<LI>Can't Open mapdir to read</LI>"; }
+		else { $errorstring = "Can't open mapdir to read."; }
 		
 		ksort($titles);
 		
+		if ($n == 0) { $errorstring = "No files in mapdir"; }
+	}
+	else { $errorstring = "NO DIRECTORY named $mapdir"; }
+
+
+	print 'OR<br />Create A New Map as a copy of an existing map:<br>';
+	print '<form method="GET">';
+	print 'Named: <input type="text" name="mapname" size="20"> based on ';
+
+	print '<input name="action" type="hidden" value="newmapcopy">';
+	print '<input name="plug" type="hidden" value="'.$fromplug.'">';
+	print '<select name="sourcemap">';
+	
+	if($errorstring == '')
+	{
+		foreach ($titles as $file=>$title)
+		{
+			$nicefile = htmlspecialchars($file);
+			print "<option value=\"$nicefile\">$nicefile</option>\n";
+		}
+	}
+	else
+	{
+		print '<option value="">'.$errorstring.'</option>';
+	}
+	
+	print '</select>';
+	print '<input type="submit" value="Create Copy">';
+	print '</form>';
+	print 'OR<br />';
+	print 'Open An Existing Map (looking in ' . $mapdir . '):<ul class="filelist">';
+
+	if($errorstring == '')
+	{
 		foreach ($titles as $file=>$title)
 		{
 			$title = $titles[$file];
-			print "<li><a href=\"?mapname=$file\">$file</a> - <span class=\"comment\">$title</span></li>\n";
+			$note = $notes[$file];
+			$nicefile = htmlspecialchars($file);
+			print "<li>$note<a href=\"?mapname=$nicefile&plug=$fromplug\">$nicefile</a> - <span class=\"comment\">$title</span></li>\n";
 		}
-
-		if ($n == 0) { print "<LI>No files</LI>"; }
 	}
-	else { print "<LI>NO DIRECTORY named $mapdir</LI>"; }
+	else
+	{
+		print '<li>'.$errorstring.'</li>';
+	}
 
-	print "</UL>";
+	print "</ul>";
 
 	print "</div>"; // dlgbody
 	print '<div class="dlgHelp" id="start_help">PHP Weathermap ' . $WEATHERMAP_VERSION

@@ -1,5 +1,5 @@
 <?php
-	$use_jquery = FALSE;
+	$use_jquery = TRUE;
 
 require_once 'editor.inc.php';
 require_once 'Weathermap.class.php';
@@ -9,8 +9,16 @@ $mapdir='configs';
 $cacti_base = '../../';
 $cacti_url = '/';
 $ignore_cacti=FALSE;
+$configerror = '';
 
 $config_loaded = @include_once 'editor-config.php';
+
+// XXX - if something from the old-style config is already defined by here, we need to warn.
+
+if( isset($config) )
+{
+    $configerror = 'OLD editor config file format. The format of this file changed in version 0.92 - please check the new editor-config.php-dist and update your editor-config.php file. [WMEDIT02]';
+}
 
 if( is_dir($cacti_base) && file_exists($cacti_base."/include/config.php") )
 {
@@ -19,12 +27,17 @@ if( is_dir($cacti_base) && file_exists($cacti_base."/include/config.php") )
 
 	// CHANGE: this to be the URL of the base of your Cacti install
 	// it MUST end with a / character!
-	$config['base_url']=$cacti_url;
-	$cacti_found=TRUE;
+	$config['base_url'] = $cacti_url;
+	$cacti_found = TRUE;
 }
 else
 {
 	$cacti_found = FALSE;
+}
+
+if(! is_writable($mapdir))
+{
+	$configerror = "The map config directory is not writable by the web server user. You will not be able to edit any files until this is corrected. [WMEDIT01]";
 }
 
 chdir(dirname(__FILE__));
@@ -42,13 +55,14 @@ if(!module_checks())
 {
 	print "<b>Required PHP extensions are not present in your mod_php/ISAPI PHP module. Please check your PHP setup to ensure you have the GD extension installed and enabled.</b><p>";
 	print "If you find that the weathermap tool itself is working, from the command-line or Cacti poller, then it is possible that you have two different PHP installations. The Editor uses the same PHP that webpages on your server use, but the main weathermap tool uses the command-line PHP interpreter.<p>";
+	print "<p>You should also run <a href=\"check.php\">check.php</a> to help make sure that there are no problems.</p><hr/>";
 	print "Here is a copy of the phpinfo() from your PHP web module, to help debugging this...<hr>";
 	phpinfo();
 	exit();
 }
 
 if(isset($_REQUEST['action'])) { $action = $_REQUEST['action']; }
-if(isset($_REQUEST['mapname'])) { $mapname = $_REQUEST['mapname']; }
+if(isset($_REQUEST['mapname'])) { $mapname = $_REQUEST['mapname'];  $mapname = str_replace('/','',$mapname); }
 if(isset($_REQUEST['selected'])) { $selected = $_REQUEST['selected']; }
 
 if($mapname == '')
@@ -64,9 +78,19 @@ else
 	$map = new WeatherMap;
 	$map->context = 'editor';
 
+	$fromplug = FALSE;
+	if(isset($_REQUEST['plug']) && (intval($_REQUEST['plug'])==1) ) { $fromplug = TRUE; }
+
 	switch($action)
 	{
 	case 'newmap':
+		$map->WriteConfig($mapfile);
+		break;
+
+	case 'newmapcopy':
+		if(isset($_REQUEST['sourcemap'])) { $sourcemapname = $_REQUEST['sourcemap']; }		
+		$sourcemap = $mapdir.'/'.$sourcemapname;
+		$map->ReadConfig($sourcemap);
 		$map->WriteConfig($mapfile);
 		break;
 
@@ -152,6 +176,70 @@ else
 
 		exit();
 		break;
+        
+        case 'fetch_config':
+                $map->ReadConfig($mapfile);
+		header('Content-type: text/plain');
+		$item_name = $_REQUEST['item_name'];
+                $item_type = $_REQUEST['item_type'];
+                $ok=FALSE;
+
+                if($item_type == 'node')
+                {
+                        if(isset($map->nodes[$item_name]))
+                        {
+                                print $map->nodes[$item_name]->WriteConfig();
+                                $ok=TRUE;
+                        }
+                }
+                if($item_type == 'link')
+                {
+                        if(isset($map->links[$item_name]))
+                        {
+                                print $map->links[$item_name]->WriteConfig();
+                                $ok=TRUE;
+                        }
+                }
+                
+                if(! $ok) { print "# the request item didn't exist. That's probably a bug.\n"; }
+		
+		exit();
+		break;
+
+	case "set_link_config":
+		$map->ReadConfig($mapfile);
+
+		$link_name = $_REQUEST['link_name'];
+		$link_config = $_REQUEST['item_configtext'];
+                
+                $map->links[$link_name]->config_override=$link_config;
+                
+		$map->WriteConfig($mapfile);
+                // now clear and reload the map object, because the in-memory one is out of sync
+                // - we don't know what changes the user made here, so we just have to reload.
+                unset($map);
+                $map = new WeatherMap;
+                $map->context = 'editor';
+                $map->ReadConfig($mapfile);
+		break;
+
+	case "set_node_config":
+		$map->ReadConfig($mapfile);
+
+		$node_name = $_REQUEST['node_name'];
+		$node_config = $_REQUEST['item_configtext'];
+                
+                $map->nodes[$node_name]->config_override=$node_config;
+                
+		$map->WriteConfig($mapfile);
+                // now clear and reload the map object, because the in-memory one is out of sync
+                // - we don't know what changes the user made here, so we just have to reload.
+                unset($map);
+                $map = new WeatherMap;
+                $map->context = 'editor';
+                $map->ReadConfig($mapfile);
+		break;
+
 
 	case "set_node_properties":
 		$map->ReadConfig($mapfile);
@@ -192,6 +280,9 @@ else
 		$map->nodes[$new_node_name]->label = $_REQUEST['node_label'];
 		$map->nodes[$new_node_name]->infourl = $_REQUEST['node_infourl'];
 		$map->nodes[$new_node_name]->overliburl = $_REQUEST['node_hover'];
+		
+		$map->nodes[$new_node_name]->x = intval($_REQUEST['node_x']);
+		$map->nodes[$new_node_name]->y = intval($_REQUEST['node_y']);
 
 		if($_REQUEST['node_iconfilename'] == '--NONE--')
 		{
@@ -325,6 +416,7 @@ else
 		$map->ReadConfig($mapfile);
 
 		$param2 = $_REQUEST['param'];
+		$param2 = substr($param2,0,-2);
 		$newaction = 'add_link2';
 		$selected = 'NODE:'.$param2;         
 		break;
@@ -333,6 +425,7 @@ else
 		$map->ReadConfig($mapfile);
 		$a = $_REQUEST['param2'];
 		$b = $_REQUEST['param'];
+		$b = substr($b,0,-2);
 		$log = "[$a -> $b]";
 
 		if($a != $b)
@@ -486,8 +579,15 @@ else
 
 		$node->x = snap($x);
 		$node->y = snap($y);
-		$node->name = "node".time();
-		$node->label = "NODE";
+		
+		$newnodename = sprintf("node%05d",time()%10000);
+		while(array_key_exists($newnodename,$map->nodes))
+		{
+			$newnodename .= "a";
+		}
+		
+		$node->name = $newnodename;
+		$node->label = "Node";
 
 		$map->nodes[$node->name] = $node;
 
@@ -520,6 +620,26 @@ else
 		}           
 
 		unset($map->nodes[$target]);
+
+		$map->WriteConfig($mapfile);
+		break;
+
+	case "clone_node":
+		$map->ReadConfig($mapfile);
+
+		$target = $_REQUEST['param'];
+		$log = "clone node ".$target;
+
+        $newnodename = $target."_copy";
+                
+		$node = new WeatherMapNode;
+		$node->Reset($map);
+		$node->CopyFrom($map->nodes[$target]);
+
+        $node->name = $newnodename;
+        $node->x += 30;
+
+		$map->nodes[$newnodename] = $node;
 
 		$map->WriteConfig($mapfile);
 		break;
@@ -564,17 +684,11 @@ else
 	</style>
   <link rel="stylesheet" type="text/css" media="screen" href="editor.css" />
   <script src="editor.js" type="text/javascript"></script>
-<?php
-if($use_jquery)
-{
-?>
-  <script src="lib/javascript/jquery-latest.pack.js" type="text/javascript"></script>
-  <script src="lib/javascript/jquery.shortkeys.js" type="text/javascript"></script>
-  <script src="lib/javascript/jquery.contextmenu.packed.js" type="text/javascript"></script>
-<?php
-}
-?>
+<script src="lib/javascript/jquery-latest.pack.js" type="text/javascript"></script>
 	<script type="text/javascript">
+	
+	var fromplug=<?php echo ($fromplug==TRUE ? 1:0); ?>;
+	
 	// the only javascript in here should be the objects representing the map itself
 	// all code should be in editor.js
 	<?php print $map->asJS() ?>
@@ -590,29 +704,6 @@ if($use_jquery)
 	}
 
 	sort($imlist);
-
-	if($use_jquery)
-	{
-?>
-	$(document).ready(function(){
-
-		$.contextMenu.defaults({
-			   itemStyle : {
-			fontFamily : "arial narrow",
-			fontSize: "10px"
-			
-		      }
-		});
-
-	   $("area[@id^=NODE:]").contextMenu("#nodeMenu1", { });
-	   $("area[@id^=LINK:]").contextMenu("#linkMenu1", { });
-	   $("area[@id^=LEGEND:]").contextMenu("#legendMenu1", { });
-	   $("area#TIMESTAMP").contextMenu("#timeMenu1", { }); 
-	   $("img#existingdata").contextMenu("#mapMenu1", { } );
-	
-	 });
-<?php
-	}
 ?>
 	</script>
   <title>PHP Weathermap Editor <?php echo $WEATHERMAP_VERSION; ?></title>
@@ -621,7 +712,7 @@ if($use_jquery)
 <body id="mainview">
   <div id="toolbar">
 	<ul>
-	  <li class="tb_active" id="tb_newfile">Change<br />File</li>
+           <li class="tb_active" id="tb_newfile">Change<br />File</li>
 	  <li class="tb_active" id="tb_addnode">Add<br />Node</li>
 	  <li class="tb_active" id="tb_addlink">Add<br />Link</li>
 	  <li class="tb_active" id="tb_poslegend">Position<br />Legend</li>
@@ -631,23 +722,25 @@ if($use_jquery)
 	  <li class="tb_active" id="tb_colours">Manage<br />Colors</li>
 	  <li class="tb_active" id="tb_manageimages">Manage<br />Images</li>
 	  <li class="tb_active" id="tb_prefs">Editor<br />Settings</li>
+        <li class="tb_coords" id="tb_coords">Position<br />---, ---</li>
 	  <li class="tb_help"><span id="tb_help">or click a Node or Link to edit it's properties</span></li>
 	</ul>
   </div>
 
   <form action="editor.php" method="post" name="frmMain">
-	<div align="center">
+	<div align="center" id="mainarea">
+		<input type="hidden" name="plug" value="<?php echo ($fromplug==TRUE ? 1 : 0) ?>">
 	 <input style="display:none" type="image"
 	  src="<?php echo  $imageurl; ?>" id="xycapture" /><img src=
 	  "<?php echo  $imageurl; ?>" id="existingdata" alt="Weathermap" usemap="#weathermap_imap"
-	   /><br />
-	   <div class="debug"><p><strong>Debug:</strong> <a href="?action=nothing&amp;mapname=<?php echo  $mapname ?>">Do Nothing</a> 
+	   />
+	   <div class="debug"><p><strong>Debug:</strong> <a href="?<?php echo ($fromplug==TRUE ? 'plug=1&amp;' : ''); ?>action=nothing&amp;mapname=<?php echo  $mapname ?>">Do Nothing</a> 
 	   <span><label for="mapname">mapfile</label><input type="text" name="mapname" value="<?php echo  $mapname; ?>" /></span>
 	   <span><label for="action">action</label><input type="text" id="action" name="action" value="<?php echo  $newaction ?>" /></span>
-	  <span><label for="param">param</label><input type="text" name="param" id="param" value="" /></span> 
-	  <span><label for="param2">param2</label><input type="text" name="param2" id="param2" value="<?php echo  $param2 ?>" /></span> 
+	  <span><label for="param">param</label><input type="text" name="param" id="param" value="" /></span>
+            <span><label for="param2">param2</label><input type="text" name="param2" id="param2" value="<?php echo  $param2 ?>" /></span> 
 	  <span><label for="debug">debug</label><input id="debug" value="" name="debug" /></span> 
-	  <a target="configwindow" href="?action=show_config&amp;mapname=<?php echo  $mapname ?>">See config</a></p>
+	  <a target="configwindow" href="?<?php echo ($fromplug==TRUE ? 'plug=1&amp;':''); ?>action=show_config&amp;mapname=<?php echo  $mapname ?>">See config</a></p>
 	<pre><?php echo  $log ?></pre>
 	  </div>
 	   <map name="weathermap_imap">
@@ -678,6 +771,10 @@ if($use_jquery)
 
 	  <div class="dlgBody">
 		<table>
+		<tr>
+			<th>Position</th>
+			<td><input id="node_x" name="node_x" size=4 type="text" />,<input id="node_y" name="node_y" size=4 type="text" /></td>
+		</tr>
 		  <tr>
 			<th>Internal Name</th>
 			<td><input id="node_new_name" name="node_new_name" type="text" /></td>
@@ -714,8 +811,6 @@ if($use_jquery)
 		}
 	}
 ?>
-
-
 		</select></td>
 		  </tr>
 		  <tr>
@@ -724,7 +819,7 @@ if($use_jquery)
 		  </tr>
 		  <tr>
 			<th></th>
-			<td><a id="node_move" class="dlgTitlebar">Move Node</a><a class="dlgTitlebar" id="node_delete">Delete Node</a></td>
+			<td><a id="node_move" class="dlgTitlebar">Move</a><a class="dlgTitlebar" id="node_delete">Delete</a><a class="dlgTitlebar" id="node_clone">Clone</a><a class="dlgTitlebar" id="node_edit">Edit</a></td>
 		  </tr>
 		</table>
 	  </div>
@@ -791,6 +886,7 @@ if($use_jquery)
 			  <th>'Hover' Graph URL</th>
 			  <td><input id="link_hover"  size="20" name="link_hover" type="text" /></td>
 			</tr>
+		  
 			<tr>
 			  <th></th>
 			  <td>&nbsp;</td>
@@ -798,7 +894,7 @@ if($use_jquery)
 			<tr>
 			  <th></th>
 			  <td><a class="dlgTitlebar" id="link_delete">Delete
-			  Link</a></td>
+			  Link</a><a class="dlgTitlebar" id="link_edit">Edit</a></td>
 			</tr>
 		  </table>
 	  </div>
@@ -826,7 +922,7 @@ if($use_jquery)
 		<table>
 		  <tr>
 			<th>Map Title</th>
-			<td><input name="map_title" size="25" type="text" value="<?php echo  $map->title ?>"/></td>
+			<td><input id="map_title" name="map_title" size="25" type="text" value="<?php echo  $map->title ?>"/></td>
 		  </tr>
 		<tr>
 			<th>Legend Text</th>
@@ -885,6 +981,7 @@ if($use_jquery)
 ?>
 			</select></td>
 		  </tr>
+		
 		</table>
 	  </div>
 
@@ -910,7 +1007,7 @@ if($use_jquery)
 		<table>
 		  <tr>
 			<th>Link Labels</th>
-			<td><select name="mapstyle_linklabels">
+			<td><select id="mapstyle_linklabels" name="mapstyle_linklabels">
 			  <option <?php echo ($map->defaultlink->labelstyle=='bits' ? 'selected' : '') ?> value="bits">Bits/sec</option>
 			  <option <?php echo ($map->defaultlink->labelstyle=='percent' ? 'selected' : '') ?> value="percent">Percentage</option>
 			  <option <?php echo ($map->defaultlink->labelstyle=='none' ? 'selected' : '') ?> value="none">None</option>
@@ -1023,43 +1120,27 @@ if($use_jquery)
 	  </div>
 	</div><!-- Images -->
 
-  </form>
-  	<?php
-if($use_jquery)
-{
-	?>
-     <div class="contextMenu" id="linkMenu1">
-      <ul>
-	<li id="properties"><img src="editor-resources/page_white_text.png" /> Link Properties</li>
-	<li id="delete"><img src="editor-resources/cross.png" /> Delete Link</li>
-      </ul>
-    </div>
-     <div class="contextMenu" id="nodeMenu1">
-      <ul>
-	<li id="properties"><img src="editor-resources/page_white_text.png" /> Node Properties</li>
-      	<li id="move"><img src="editor-resources/arrow_out.png" /> Move Node</li>
-        <li id="delete"><img src="editor-resources/cross.png" /> Delete Node</li>
-      </ul>
-    </div>
-     <div class="contextMenu" id="mapMenu1">
-      <ul>
-	<li id="properties"><img src="editor-resources/page_white_text.png" /> Map Properties</li>
-      </ul>
-    </div>
-        <div class="contextMenu" id="legendMenu1">
-      <ul>
-	<li id="scaleproperties"><img src="editor-resources/page_white_text.png" /> Edit Scale</li>
-	<li id="legendproperties"><img src="editor-resources/page_white_text.png" /> Legend Properties</li>
-      </ul>
-    </div>
-	<div class="contextMenu" id="timeMenu1">
-      <ul>
-		<li id="stampproperties"><img src="editor-resources/page_white_text.png" /> Timestamp Properties</li>
-      </ul>
-    </div>
-	<?php
-}
-	?>
+        <div id="dlgTextEdit" class="dlgProperties">
+	  <div class="dlgTitlebar">
+		Edit Map Object
+		<ul>
+		  <li><a title="Submit any changes made" id="tb_textedit_submit">Submit</a></li>
+		  <li><a title="Cancel any changes" id="tb_textedit_cancel">Cancel</a></li>
+		</ul>
+	  </div>
+
+	  <div class="dlgBody">
+		<p>You can edit the map items directly here.</p>
+                <textarea wrap="no" id="item_configtext" name="item_configtext" cols=40 rows=15></textarea>
+	  </div>
+
+	  <div class="dlgHelp" id="images_help">
+		Helpful text will appear here, depending on the current
+		item selected. It should wrap onto several lines, if it's
+		necessary for it to do that.
+	  </div>
+	</div><!-- TextEdit -->
+    </form>
 </body>
 </html>
 <?php
