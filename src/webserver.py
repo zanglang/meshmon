@@ -3,34 +3,61 @@ MeshMon internal webserver
 Version 0.1 - Jerry Chong <zanglang@gmail.com>
 """
 
-import thread, web
-import config
+import os, thread, web
+import config, logging, nodes
 
 render = web.template.render('html/')
 
 urls = (
 	'/', 'index',
-	'/config.js', 'configure_js' 
+	'/update', 'update',	'/js/(.*)', 'js',
+	'/images/(.*)', 'images',
+	'/view/(.*)', 'view'
 )
+
 
 class index:
 	""" Index page for web.py """
 	def GET(self):
-		#print "Hello, world!"
-		print render.index('t')
+		""" Index page generator. The web interface will parse this script
+			to determine which images to show on runtime """		files = map(lambda node: [node.address + '-' + interface + '.' +
+											config.ImgFormat.lower()
+									for interface in node.interfaces],
+									nodes.collection)
+		interval = int(config.TrafficInterval) * 1000
+		print render.index(files, interval)
 
-class configure_js:
-	""" Javascript generator. The web interface will parse this script
-		to determine which images to show on runtime """
-	def GET(self):
-		# array for images we will be generating
-		files = map(lambda node: [config.ImgPath + '/' + node.address + '-' +
-								interface + '.' + config.ImgFormat.lower()
-								for interface in node.interfaces],
-								nodes.collection)		
-		print 'files = ["', '","'.join(files), '"]"'
-		print 'interval =', str(config.TrafficInterval * 1000)
+
+class images:
+	""" Images loader """
+	def GET(self, filename):
+		image = os.path.join(config.ImgPath, filename)
+		if os.path.exists(image):
+			web.header("Cache-Control", "no-cache, must-revalidate")
+			print open(image, 'rb').read()
+		else:
+			web.notfound()
+			
+			
+class js:
+	""" Javascript loader """
+	def GET(self, filename):
+		try:
+			print open('html/' + filename, 'r').read()
+		except:
+			web.notfound()
+
 		
+class update:
+	""" Handle updating of parameters from form """
+	def POST(self):
+		i = web.input()
+		web.debug(i)
+		if i.has_key('interval'):
+			config.TrafficInterval = int(i.interval) / 1000
+		web.seeother('/')
+		
+
 def start():
 	""" Start internal webserver """
 	
@@ -46,7 +73,8 @@ def start():
 	# does not provide methods to kill the webserver. We'll just terminate upon
 	# sys.exit() then.
 	#thread.start_new_thread(web.run, (urls, globals()))
-	web.run(urls, globals())
-	
+	web.run(urls, globals(), web.reloader)
+
+
 if __name__ == "__main__":
 	start()
