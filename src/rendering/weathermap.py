@@ -90,7 +90,7 @@ class WeathermapThread(threads.MonitorThread):
 					# Is this a parallel link? 0 = first link, >=1 = parallel
 					if links[neighbour] == 1:
 						conf_template += (('LINK MN%s-%s-%s\n\t' +
-								'NODES MN%s %s\n\t' +
+								'NODES MN%s MN%s\n\t' +
 								'TARGET %s\n\n') %
 									(node.address, interface, neighbour.address,
 									node.address, neighbour.address,
