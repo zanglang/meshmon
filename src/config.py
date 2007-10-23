@@ -37,7 +37,7 @@ SnmpVersion = '2c'
 Community = 'public'
 
 # Interval for collecting traffic data in seconds
-TrafficInterval = 10
+TrafficInterval = 3
 
 #-----------------
 # Network Topology

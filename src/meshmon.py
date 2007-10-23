@@ -45,6 +45,7 @@ if __name__ == "__main__":
 			nodes.add(n)
 		
 		plugin.initialize()
+		# BUG: web.py blocks here!
 		webserver.start()
 		
 		num_threads = threads.size()

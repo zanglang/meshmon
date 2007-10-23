@@ -117,6 +117,8 @@ class GathererThread(threads.MonitorThread):
 		try:
 			oids = snmp.walk(self.target.address,
 					snmp.load_symbol('IF-MIB', 'ifDescr'))
+			up = snmp.walk(self.target.address,
+					snmp.load_symbol('IF-MIB', 'ifAdminStatus'))
 		except Exception, e:
 			logging.error('Unable to get interface OIDs for ' +
 				`self.target.address` + ': ' + `e`)
@@ -125,12 +127,14 @@ class GathererThread(threads.MonitorThread):
 		# check which interfaces/indices are to be monitored
 		for index, oid in enumerate(oids):
 			if oid[0][1] in self.target.interfaces:
+			
+				# check if interface is online
+				if up[index][0][1] != 1:
+					continue
 				
-				# add SNMP oids to be polled
-				#oid_num = (InOctets + (index + 1,),
-				#		OutOctets + (index + 1,))
-				oid_num = (InOctets + (oid[0][0][len(oid[0][0]) - 1],),
+				# add SNMP oids to be polled				oid_num = (InOctets + (oid[0][0][len(oid[0][0]) - 1],),
 						OutOctets + (oid[0][0][len(oid[0][0]) - 1],))
+						
 				if not oid_num in self.oids:
 					self.oids.append(oid_num)
 				else:
@@ -152,8 +156,8 @@ class GathererThread(threads.MonitorThread):
 						rrdtool.create(rrd_file,
 							#'-b now -60s',				# Start time now -1 min
 							'-s ' + `config.TrafficInterval`,	# interval
-							'DS:in:COUNTER:' + `config.TrafficInterval * 2` + ':0:3500000',
-							'DS:out:COUNTER:' + `config.TrafficInterval * 2` + ':0:3500000',
+							'DS:traffic_in:COUNTER:' + `config.TrafficInterval * 2` + ':0:3500000',
+							'DS:traffic_out:COUNTER:' + `config.TrafficInterval * 2` + ':0:3500000',
 							'RRA:LAST:0.1:1:720',		# 720 samples of 1 minute (12 hours)
 							#'RRA:LAST:0.1:5:576',		# 576 samples of 5 minutes (48 hours)
 							'RRA:AVERAGE:0.1:1:720',	# 720 samples of 1 minute (12 hours)
@@ -186,7 +190,6 @@ class GathererThread(threads.MonitorThread):
 				in_query, out_query = \
 					snmp.get(self.target.address, oids[0]), \
 					snmp.get(self.target.address, oids[1])
-				print 'in', in_query, 'out', out_query
 			except Exception, e:
 				logging.error('Could not poll in/out octets for ' +
 					`self.target.address` + ': ' + `e`)
@@ -196,17 +199,18 @@ class GathererThread(threads.MonitorThread):
 				in_octets = in_query[0][1]
 				out_octets = out_query[0][1]
 				
-				logging.debug('Updating RRDtool in:' + str(in_octets) +
+				logging.debug('Updating RRDtool(' + str(index) +
+					') in:' + str(in_octets) +
 					' out:' + str(out_octets))
 			
 				# push results into rrdtool
 				try:
 					rrdtool.update(self.rrd_files[index],
 						'-t',
-						'in:out',
+						'traffic_in:traffic_out',
 						'N:' + str(in_octets) + ':' + str(out_octets)
 					)
-				except rrdtool.error, e:
+				except Exception, e:
 					logging.error(e)
 					
 #-------------------------------------------------------------------------------
@@ -268,7 +272,7 @@ class SimulationGathererThread(threads.MonitorThread):
 			try:
 				rrdtool.update(rrd_file,
 					'-t',
-					'in:out',
+					'traffic_in:traffic_out',
 					'N:' + str(self.in_octets[rrd_file]) +
 						':' + str(self.out_octets[rrd_file])
 				)

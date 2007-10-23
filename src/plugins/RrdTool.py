@@ -29,8 +29,8 @@ def initialize():
 				logging.debug('Starting simulated SNMP thread for ' + `node.address`)
 				threads.add(gatherers.rrdsink.SimulationGathererThread(node))
 				
-			logging.debug('Starting graphing thread for ' + `node.address`)
-			threads.add(rendering.rrd.GraphingThread(node))
+			#logging.debug('Starting graphing thread for ' + `node.address`)
+			#threads.add(rendering.rrd.GraphingThread(node))
 				
-	logging.debug('Starting weathermap thread')
-	threads.add(rendering.weathermap.WeathermapThread())
+	#logging.debug('Starting weathermap thread')
+	#threads.add(rendering.weathermap.WeathermapThread())
