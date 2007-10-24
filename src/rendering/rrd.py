@@ -67,7 +67,8 @@ class GraphingThread(threads.MonitorThread):
 			try:
 				rrdtool.graph(self.img_files[index],
 					'-s -1' + config.GraphInterval,	# hour
-					'-t', 'Router hourly graph (1 minute average)',
+					'-t', '%s %s hourly (1 minute average)' % (self.node.address,
+								self.node.interfaces[index]),
 					'-h', '70',
 					'-w', '350',
 					'-a', config.ImgFormat,
@@ -91,7 +92,7 @@ class GraphingThread(threads.MonitorThread):
 					'CDEF:outbitsinvaverage=outbitsaverage,-1,*',
 					'CDEF:outbitsinvmax=outbitsmax,-1,*',
 					'AREA:inbitsaverage#0000FF:In (last/avg/max)..\\:',
-					'LINE1:inbitsmax#FF0000',
+					'LINE1:inbitsmax',
 					'GPRINT:inbitslast:LAST:%5.1lf %sbps',
 					'GPRINT:inbitsaverage:AVERAGE:%5.1lf %sbps',
 					'GPRINT:inbitsmax:MAX:%5.1lf %sbps\\n',

@@ -14,32 +14,39 @@ collection = []
 positions = {}
 
 # size of current mesh topology
-width = 500
-height = 520
+width = 0
+height = 0
 # number of pixels between nodes
 buffer = 200
 # number of pixels in top/bottom margin
 vmargin = 120
+# number of pixels in left/right margin
+hmargin = 250
 # temporary table for allocated nodes
 allocations = {}
 # free layers available
 layers = [0,1]
 # highest layer available
-highlayer = 1
+highlayer = 1
+def assign(address, position):
+	positions[address] = position
+	
+	global width, height
+	# adjust horizantal
+	print position[0]
+	if position[0] > width + hmargin:
+		width = position[0] + hmargin
+		print 'Adjusting width to', width, 'for', position
+	if position[1] > height + vmargin:
+	 	height = position[1] + vmargin
 
-#####
-# TODO Chunks
-# 1. Link thread by SNMP (can use AODV instead)
 
 def add(node):
 	""" Add a mesh node into the topology and regenerate positions """
+	
+	if node in collection:
+		return
 	collection.append(node)
-	"""try:
-		node.position = positions.pop()
-		logging.debug('Node ' + node + ' assigned to ' + str(node.position))
-	except IndexError:
-		logging.error('FIXME: Ran out of node positions.')
-		node.position = (0,0)"""
 	
 	logging.debug('Adding new node %s to topology' % node.address)
 	
@@ -47,8 +54,8 @@ def add(node):
 	### TODO: add plugin to read NSU/2 files
 	if positions.has_key(node.address):
 		
-		logging.debug('Assigned node to ' + str(node.position))
-		node.position = positions[node,address]
+		logging.debug('Assigned node to ' + str(positions[node.address]))
+		node.position = positions[node.address]
 		
 	elif config.DynamicTopology:
 		global height, highlayer
@@ -57,6 +64,7 @@ def add(node):
 		layer = random.choice(layers)
 		if not allocations.has_key(layer):
 			allocations[layer] = []
+			
 		logging.debug('Adding node to layer %d' % layer)		
 		allocations[layer].append(node)
 		
@@ -87,5 +95,5 @@ def add(node):
 						(node.address, str(node.position)))
 						
 	else:
-		# any other methods?
-		raise Exception, 'No topology methods?'
+		# any other methods? Just make sure everything gets adjusted properly!
+		pass

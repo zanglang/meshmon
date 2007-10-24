@@ -20,10 +20,10 @@ class index:
 	""" Index page for web.py """
 	def GET(self):
 		""" Index page generator. The web interface will parse this script
-			to determine which images to show on runtime """		files = map(lambda node: [node.address + '-' + interface + '.' +
-											config.ImgFormat.lower()
-									for interface in node.interfaces],
-									nodes.collection)
+			to determine which images to show on runtime """		files = reduce(lambda files, node:
+					files + [file.replace('.rrd','.png')
+							for file in node.rrd_files],
+					nodes.collection, [])
 		interval = int(config.TrafficInterval) * 1000
 		print render.index(files, interval)
 

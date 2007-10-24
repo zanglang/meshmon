@@ -21,7 +21,7 @@ def initialize():
 	threads.add(gatherers.rrdsink.AodvThread())
 	
 	for node in nodes.collection:
-		if (node.type == nodes.ROUTER):			
+		if (node.type == nodes.ROUTER):
 			if not config.Simulate:
 				logging.debug('Starting SNMP poll thread for ' + `node.address`)
 				threads.add(gatherers.rrdsink.GathererThread(node))	
@@ -29,8 +29,8 @@ def initialize():
 				logging.debug('Starting simulated SNMP thread for ' + `node.address`)
 				threads.add(gatherers.rrdsink.SimulationGathererThread(node))
 				
-			#logging.debug('Starting graphing thread for ' + `node.address`)
-			#threads.add(rendering.rrd.GraphingThread(node))
+			logging.debug('Starting graphing thread for ' + `node.address`)
+			threads.add(rendering.rrd.GraphingThread(node))
 				
-	#logging.debug('Starting weathermap thread')
-	#threads.add(rendering.weathermap.WeathermapThread())
+	logging.debug('Starting weathermap thread')
+	threads.add(rendering.weathermap.WeathermapThread())

@@ -7,7 +7,7 @@ from threading import Thread
 import config, logging, time, traceback
 
 if (config.Debug):
-	logging.basicConfig(level=logging.DEBUG)
+	logging.basicConfig(level=logging.DEBUG) 
 	
 pool = []	# Pool for managing multiple threads
 

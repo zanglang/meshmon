@@ -20,9 +20,9 @@ TIMEPOS $timepos Last Updated: %b %d %Y %H:%M:%S
 #HTMLFILE $imgdir/weathermap.html
 
 # label of TITLE
-#TITLE \"NICTA MESH Router Topology Map\"
+TITLE Mesh Router Topology Map
 # Position of title in graph
-TITLEPOS 130 685
+TITLEPOS 180 30
 # Color of background title
 #TITLEBACKGROUND 0 192 0
 # Color of font to display title

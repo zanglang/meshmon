@@ -58,7 +58,7 @@ class WeathermapThread(threads.MonitorThread):
 				'imgdir': config.ImgPath,
 				'int': config.GraphInterval,
 				'keypos': str(int(topology.width * 0.75)) + ' 15',
-				'timepos': '290 520',
+				'timepos': str(topology.width - 210) + ' ' + str(topology.height - 5),
 				'topologyimg': config.TopologyImg + '.tmp',
 				'width': int(topology.width)
 			})
@@ -91,7 +91,7 @@ class WeathermapThread(threads.MonitorThread):
 					if links[neighbour] == 1:
 						conf_template += (('LINK MN%s-%s-%s\n\t' +
 								'NODES MN%s MN%s\n\t' +
-								'TARGET %s\n\n') %
+								'TARGET %s\n') %
 									(node.address, interface, neighbour.address,
 									node.address, neighbour.address,
 									rrd_file))
@@ -102,19 +102,18 @@ class WeathermapThread(threads.MonitorThread):
 						offsets2 = get_offsets(neighbour.position, links[neighbour])
 						conf_template += (('LINK MN%s-%s-%s-%d\n\t' +
 								'NODES MN%s:%d:%d  MN%s:%d:%d\n\t' +
-								'TARGET %s\n\n') % (
+								'TARGET %s\n') % (
 									node.address, interface,
 									neighbour.address, links[neighbour],
 									node.address, offsets[0], offsets[1]),
 									neighbour.address, offsets2[0], offsets2[1],
 									rrd_file)
 									# we'll used straight lines for now
-									#'\tVIA ' + position1 + '\n\n')
+									#'\tVIA ' + position1 + '\n')
 
-					#if config.ShowBandwidth:
-					#	conf_template += ('\tBANDWIDTH ' + `config.Bandwidth` +
-					#		'\n\tDISPLAYVALUE 1\n')
-					# conf_template += '\tARROW normal\n\n'
+					if config.ShowBandwidth:
+						conf_template += ('\tBANDWIDTH ' + `config.Bandwidth` + 'K\n')
+					conf_template += ('\n')
 					
 			# write to config file
 			f = open('weathermap.conf', 'w')

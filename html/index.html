@@ -5,6 +5,24 @@ $def with (files, interval)
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <title>Insert title here</title>
+<style>
+body {
+	font-size: 16px;
+}
+
+.container {
+	border-style: solid;
+	border-width: 1px;
+	width: 470px;
+	height: 230px;
+	padding-top: 15px;
+	padding-left: 10px;
+}
+
+a {
+	font-size: 10px;
+}
+</style>
 <script type="text/javascript" src="js/prototype.js"></script>
 <script type="text/javascript" src="js/builder.js"></script>
 <script type="text/javascript">
@@ -15,21 +33,26 @@ $def with (files, interval)
 	
 	function init() {
 		imagesDiv = \$('images');
-		files.each(function(file) {
+		/*files.each(function(file) {
 			var ele = Builder.node('img', {
 				src: 'images/' + file,
 			});
 			imagesDiv.appendChild(ele);
 			images.push(ele);
+		});*/
+		var ele = Builder.node('img', {
+			src: 'images/' + files[0],
 		});
+		imagesDiv.appendChild(ele);
+		images.push(ele);
 		\$('weathermap').src = 'images/weathermap.png';
-		timer = setTimeout('refresh()', interval);
+		//timer = setTimeout('refresh()', interval);
 	}
 	
 	function refresh() {
 		var rand = Math.round(Math.random()*10000000000);
 		images.each(function(img, index) {
-			img.src = files[index] + '?rand=' + rand;
+			img.src = 'images/' + files[index] + '?rand=' + rand;
 		});
 		\$('weathermap').src = 'images/weathermap.png?rand=' + rand;
 		timer = setTimeout('refresh()', interval);
@@ -47,24 +70,35 @@ $def with (files, interval)
 	
 	function changeView() {
 		var ele = \$('statistics');
-		view = ele[ele.selectedIndex]).value
+		view = (ele[ele.selectedIndex]).value
 		if (timer != null)
 			clearTimeout(timer);
 		
 		\$('mainform').action = 'update?view=' + view
 		\$('mainform').submit()
 	}
+	
+	function expand(el) { alert(el); }
 </script>
 </head>
 <body onload="init()">
 <form id='mainform' method='POST' />
 <table style="border:0px;">
 <tr>
-	<td>
+<tr>
+<td />
+<td>
+	<table style=>
+	<td valign="top">
 		<img id="weathermap" />
 	</td>
 	<td>
 		<div id="images">
+		</div>
+		<div class="container">
+			<a class="link" onclick="expand(this)" href="javascript:">Expand</a>
+			ath4<br/><br/>
+			<img src='../192.168.1.7-ath6.png'>
 		</div>
 		<br/>
 		Refresh interval:<br/>
@@ -76,7 +110,7 @@ $def with (files, interval)
 			<option value="30">30</option>
 			<option value="60">60</option>
 		</select>
-		<br/>
+		<br/><br/>
 		Statistics View:<br/>
 		<select id="statistics" onchange="changeView()">
 			<option value="traffic">Traffic</option>

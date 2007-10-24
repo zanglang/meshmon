@@ -23,7 +23,7 @@ Debug = True
 # A tuple collection of the mobile nodes where traffic data should be collected from
 # Example: '192.168.0.1', '127.0.0.1'
 #Nodes = ('10.0.0.1','10.0.0.5','10.0.0.7')
-Nodes = ('192.168.0.50',)
+Nodes = []
 
 # A list of the interfaces to be monitored (separate by comma if more than one)
 # Example: 'eth0', 'eth1
@@ -37,14 +37,14 @@ SnmpVersion = '2c'
 Community = 'public'
 
 # Interval for collecting traffic data in seconds
-TrafficInterval = 3
+TrafficInterval = 1
 
 #-----------------
 # Network Topology
 #-----------------
 
 # Dynamically calculate topology
-DynamicTopology = True
+DynamicTopology = False
 
 # Load node coordinates from file using plugins. Automatically disabled
 # if DynamicTopology is enabled
@@ -117,4 +117,4 @@ Simulate = False
 #-----------
 
 # Change the port of the internal web server (default: 8080)
-WebServerPort = 8080
+WebServerPort = 8081

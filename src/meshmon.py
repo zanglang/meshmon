@@ -19,7 +19,7 @@ if __name__ == "__main__":
 	try:
 		# Initialize backends. This is currently hardcoded as we only
 		# have one method to gather and render data at the moment
-		MODULE = 'RrdTool'
+		MODULE = 'Simulation'
 		backend = __import__('plugins.' + MODULE)
 		plugin = backend.__dict__[MODULE]
 		if not plugin.__dict__.has_key('initialize') or \
