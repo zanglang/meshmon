@@ -6,24 +6,36 @@ Version 0.1 - Jerry Chong <zanglang@gmail.com>
 import os, thread, web
 import config, logging, nodes
 
-render = web.template.render('html/')
+render = web.template.render('html/', cache=False)
 
 urls = (
 	'/', 'index',
-	'/update', 'update',	'/js/(.*)', 'js',
+	'/update', 'update',
+	'/web/(.*)', 'webstuff',
+	'/(.*\.css)', 'webstuff',
+	'/(.*\.js)', 'webstuff',
 	'/images/(.*)', 'images',
 	'/view/(.*)', 'view'
 )
 
+# definitions for views
+TRAFFIC, WIRELESS = range(2)
+config.WebView = TRAFFIC	# Default = traffic
 
 class index:
 	""" Index page for web.py """
 	def GET(self):
 		""" Index page generator. The web interface will parse this script
-			to determine which images to show on runtime """		files = reduce(lambda files, node:
-					files + [file.replace('.rrd','.png')
-							for file in node.rrd_files],
+			to determine which images to show on runtime """
+		global view		files = reduce(lambda files, node:
+					files + [file for file in node.rrd_files],
 					nodes.collection, [])
+		for index, f in enumerate(files):
+			if config.WebView is TRAFFIC:
+				files[index] = f.replace('.rrd', '')
+			else:
+				files[index] = f.replace('.rrd', '-wifi')
+		files.sort()
 		interval = int(config.TrafficInterval) * 1000
 		print render.index(files, interval)
 
@@ -39,8 +51,8 @@ class images:
 			web.notfound()
 			
 			
-class js:
-	""" Javascript loader """
+class webstuff:
+	""" Static web files loader """
 	def GET(self, filename):
 		try:
 			print open('html/' + filename, 'r').read()
@@ -55,6 +67,10 @@ class update:
 		web.debug(i)
 		if i.has_key('interval'):
 			config.TrafficInterval = int(i.interval) / 1000
+		if i.has_key('view'):
+			config.WebView = int(i.view)
+			if config.WebView < 0 or config.WebView > WIRELESS:
+				config.WebView = TRAFFIC
 		web.seeother('/')
 		
 

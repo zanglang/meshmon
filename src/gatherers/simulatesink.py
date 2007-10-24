@@ -98,6 +98,10 @@ def populate():
 		# keep track of incoming/outgoing traffic
 		node.in_octets = {}
 		node.out_octets = {}
+		# set wireless statistics
+		node.linklevel = 50 + random.randint(-25,25)
+		node.signallevel = 50 + random.randint(-25,25)
+		node.noiselevel = 10
 		
 		# assign node positions
 		topology.assign(node.address, details['positions'])
@@ -113,7 +117,7 @@ def populate():
 				nodes.add(nnode)
 			
 			# update node's neighbours and initial connections
-			node.neighbours[nnode] = interface
+			node.neighbours[nnode] = [interface]
 			node._neighbours.append(nnode)
 			
 			if interface not in node.interfaces:
@@ -137,6 +141,10 @@ def populate():
 							'-s ' + `config.TrafficInterval`,	# interval
 							'DS:traffic_in:COUNTER:' + `config.TrafficInterval * 2` + ':0:3500000',
 							'DS:traffic_out:COUNTER:' + `config.TrafficInterval * 2` + ':0:3500000',
+							# wireless
+							'DS:link:GAUGE:120:U:U',
+							'DS:signal:GAUGE:120:U:U',
+							'DS:noise:GAUGE:120:U:U',
 							'RRA:LAST:0.1:1:720',		# 720 samples of 1 minute (12 hours)
 							#'RRA:LAST:0.1:5:576',		# 576 samples of 5 minutes (48 hours)
 							'RRA:AVERAGE:0.1:1:720',	# 720 samples of 1 minute (12 hours)
@@ -150,7 +158,11 @@ def populate():
 						raise Exception, 'Unable to create RRDtool database!'
 				else:
 					print node.address, 'using RRDtool database at ', rrd_file
-				node.rrd_files.append(rrd_file)		
+				node.rrd_files.append(rrd_file)
+				
+		node.interfaces.sort()
+		node._neighbours.sort(lambda nodex, nodey:
+				nodex.address < nodey.address and -1 or 1)
 
 				
 class SimulatorThread(threads.MonitorThread):
@@ -181,9 +193,11 @@ class SimulatorThread(threads.MonitorThread):
 			node.neighbours.clear()
 			# update the table
 			for index, n in enumerate(nnodes):
-				if len(node.neighbours) == 3 or len(n.neighbours) == 3:
-					continue
-				node.neighbours[n] = ninterfaces[index]
+				#if len(node.neighbours) == 3 or len(n.neighbours) == 3:
+				#	continue
+				if not node.neighbours.has_key(n):
+					node.neighbours[n] = []
+				node.neighbours[n].append(ninterfaces[index])
 				
 			# 128 kbytes upstream/64 downstream
 			for index, rrd_file in enumerate(node.rrd_files):
@@ -210,18 +224,23 @@ class SimulatorThread(threads.MonitorThread):
 					
 				node.in_octets[rrd_file] += in_octets
 				node.out_octets[rrd_file] += out_octets
-			
-				logging.debug('Updating RRDtool in:' + str(node.in_octets[rrd_file]) +
-					' out:' + str(node.out_octets[rrd_file]))
+				
+				# update wireless
+				link = node.linklevel + random.randint(-10,10)
+				signal = node.signallevel + random.randint(-10,10)
+				noise = node.noiselevel + random.randint(-10,10)
+				logging.debug('Updating RRDtool in:%d out:%d '\
+						'link:%d signal:%d noise:%d' %
+						(node.in_octets[rrd_file], node.out_octets[rrd_file],
+						link, signal, noise))
 			
 				# push the generated numbers into rrdtool
 				try:
 					rrdtool.update(rrd_file,
 						'-t',
-						'traffic_in:traffic_out',
-						'N:' + str(node.in_octets[rrd_file]) +
-							':' + str(node.out_octets[rrd_file])
+						'traffic_in:traffic_out:link:signal:noise',
+						'N:%d:%d:%d:%d:%d' % (node.in_octets[rrd_file],
+								node.out_octets[rrd_file], link, signal, noise)
 					)
 				except rrdtool.error, e:
 					logging.error(e)
-				

@@ -4,27 +4,13 @@ $def with (files, interval)
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<link href="iamrice.css" media="screen" rel="Stylesheet" type="text/css" />
 <title>Insert title here</title>
 <style>
-body {
-	font-size: 16px;
-}
-
-.container {
-	border-style: solid;
-	border-width: 1px;
-	width: 470px;
-	height: 230px;
-	padding-top: 15px;
-	padding-left: 10px;
-}
-
-a {
-	font-size: 10px;
-}
 </style>
-<script type="text/javascript" src="js/prototype.js"></script>
-<script type="text/javascript" src="js/builder.js"></script>
+<script type="text/javascript" src="prototype.js"></script>
+<script type="text/javascript" src="builder.js"></script>
+<script type="text/javascript" src="effects.js"></script>
 <script type="text/javascript">
 	var files = $:files
 	var images = []
@@ -32,27 +18,36 @@ a {
 	var timer = null;
 	
 	function init() {
-		imagesDiv = \$('images');
-		/*files.each(function(file) {
-			var ele = Builder.node('img', {
-				src: 'images/' + file,
-			});
-			imagesDiv.appendChild(ele);
+		imagesDiv = \$('sidebar');
+			files.each(function(file) {
+				var ele = Builder.node('div', { id: file }, [
+				Builder.node('img', {
+					src: 'web/collapsed.gif',
+					onclick: 'expand(\'' + file + '\')'
+				}),
+				' ' + file,
+				Builder.node('br'),
+				Builder.node('div', [
+					Builder.node('img', {
+						src: 'images/' + file + '.png'
+					})
+				])
+			]);
+			ele.childNodes[3].hide()
+			imagesDiv.appendChild(ele)
 			images.push(ele);
-		});*/
-		var ele = Builder.node('img', {
-			src: 'images/' + files[0],
 		});
-		imagesDiv.appendChild(ele);
-		images.push(ele);
 		\$('weathermap').src = 'images/weathermap.png';
-		//timer = setTimeout('refresh()', interval);
+		timer = setTimeout('refresh()', interval);
 	}
 	
 	function refresh() {
 		var rand = Math.round(Math.random()*10000000000);
 		images.each(function(img, index) {
-			img.src = 'images/' + files[index] + '?rand=' + rand;
+			arrow = img.childNodes[0];
+			if (!arrow.expanded || arrow.expanded == undefined)
+				return;
+			img.childNodes[3].childNodes[0].src = 'images/' + files[index] + '.png?rand=' + rand;
 		});
 		\$('weathermap').src = 'images/weathermap.png?rand=' + rand;
 		timer = setTimeout('refresh()', interval);
@@ -78,48 +73,61 @@ a {
 		\$('mainform').submit()
 	}
 	
-	function expand(el) { alert(el); }
+	function expand(id) {
+		ele = \$(id)
+		arrow = ele.childNodes[0]
+		img = ele.childNodes[3]
+		//alert(img.childNodes[0])
+		if (arrow.expanded || arrow.expanded == undefined) {
+			arrow.src = 'web/collapsed.gif';
+			arrow.expanded = false;
+			img.hide()
+			//new Effect.BlindUp(img)
+		}
+		else {
+			arrow.src = 'web/expanded.gif';
+			arrow.expanded = true
+			img.show()
+			//new Effect.BlindDown(img)
+		}
+	}
 </script>
 </head>
 <body onload="init()">
 <form id='mainform' method='POST' />
-<table style="border:0px;">
-<tr>
-<tr>
-<td />
-<td>
-	<table style=>
-	<td valign="top">
-		<img id="weathermap" />
-	</td>
-	<td>
-		<div id="images">
-		</div>
-		<div class="container">
-			<a class="link" onclick="expand(this)" href="javascript:">Expand</a>
-			ath4<br/><br/>
-			<img src='../192.168.1.7-ath6.png'>
-		</div>
-		<br/>
-		Refresh interval:<br/>
-		<select id="intervals" onchange="changeInterval()">
-			<option>---</option>
-			<option value="1">1</option>
-			<option value="5">5</option>
-			<option value="10">10</option>
-			<option value="30">30</option>
-			<option value="60">60</option>
-		</select>
-		<br/><br/>
-		Statistics View:<br/>
-		<select id="statistics" onchange="changeView()">
-			<option value="traffic">Traffic</option>
-			<option value="signal">Signal</option>
-			<option value="aodv">AODV Logs</option>
-		</select>
-		
-	</td>
-</tr>
-</table>
+<div id="container" class="clearfix"><br />
+<br />
+<div id="content" class="clearfix">
+<div id="main">
+<img id="weathermap" />
+<br/>
+<br/>
+Refresh interval:<br/>
+<select id="intervals" onchange="changeInterval()">
+	<option>---</option>
+	<option value="1">1</option>
+	<option value="5">5</option>
+	<option value="10">10</option>
+	<option value="30">30</option>
+	<option value="60">60</option>
+</select>
+<br/><br/>
+Statistics View:<br/>
+<select id="statistics" onchange="changeView()">
+	<option>---</option>
+	<option value="0">Traffic</option>
+	<option value="1">Wireless Signal</option>
+</select>
+</div>
+<div id="sidebar">
+	<br/>
+	<h3 align='center'><b>Traffic Images<b></h3>
+	<br/>
+	<div id='images'>
+	</div>
+</div>
+</div>
+</div>
+
 </body>
 </html>

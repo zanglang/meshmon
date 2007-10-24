@@ -20,6 +20,7 @@ UNKNOWN = range(4)	# this method of doing Python enumerating is not desirable
 # currently existing nodes
 collection = []
 
+
 class _Node:
 	""" Represents a mesh node in the current topology """
 	def __init__(self, address):
@@ -29,16 +30,21 @@ class _Node:
 		self.position = ()
 		self.type = UNKNOWN
 		
+		
 def add(target):
 	""" Add nodes for collection """
 	collection.append(target)
 	# renew mesh topology
 	topology.add(target)
+	collection.sort(lambda nodex, nodey:
+			nodex.address < nodey.address and -1 or 1)
+
 
 def create(target):
 	""" Create new mesh node instance """
 	logging.debug('Creating new node instance for ' + target)
 	return _Node(target)
+
 	
 def find(target):
 	""" Find the node in collection with the given IP address """

@@ -19,7 +19,7 @@ if __name__ == "__main__":
 	try:
 		# Initialize backends. This is currently hardcoded as we only
 		# have one method to gather and render data at the moment
-		MODULE = 'Simulation'
+		MODULE = config.MainPlugin
 		backend = __import__('plugins.' + MODULE)
 		plugin = backend.__dict__[MODULE]
 		if not plugin.__dict__.has_key('initialize') or \
@@ -62,6 +62,7 @@ if __name__ == "__main__":
 		pass
 	
 	print 'Please wait while MeshMon shuts down...'
-	threads.terminate_all(wait=True)
+	if config.GracefulShutdown:
+		threads.terminate_all(wait=True)
 	logging.shutdown()
 	sys.exit()

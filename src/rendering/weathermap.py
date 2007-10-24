@@ -69,51 +69,60 @@ class WeathermapThread(threads.MonitorThread):
 				
 				# neighbour = adjacent gateway nodes
 				# interface = interface last used to communicate with node
-				for neighbour, interface in node.neighbours.items():
+				for neighbour, interfaces in node.neighbours.items():
+					for interface in interfaces:
 					
-					### TODO: check if to and from are same node, check if
-					### to and from were repeated
-					if links.has_key(neighbour):
-						links[neighbour] += 1
-					else:
-						links[neighbour] = 1
+						### TODO: check if to and from are same node, check if
+						### to and from were repeated
+						if links.has_key(neighbour):
+							links[neighbour] += 1
+						else:
+							links[neighbour] = 1
+							
+						#----------------------------
+						logging.debug('Linking from ' + `node.address` +
+									' to ' + `neighbour.address`)
+						rrd_file = config.RrdTemplate.substitute({
+							'dir': config.RrdPath,
+							'host': node.address,
+							'if': interface
+						})
 						
-					#----------------------------
-					logging.debug('Linking from ' + `node.address` +
-								' to ' + `neighbour.address`)
-					rrd_file = config.RrdTemplate.substitute({
-						'dir': config.RrdPath,
-						'host': node.address,
-						'if': interface
-					})
-					
-					# Is this a parallel link? 0 = first link, >=1 = parallel
-					if links[neighbour] == 1:
-						conf_template += (('LINK MN%s-%s-%s\n\t' +
-								'NODES MN%s MN%s\n\t' +
-								'TARGET %s\n') %
-									(node.address, interface, neighbour.address,
-									node.address, neighbour.address,
-									rrd_file))
-						
-					else:
-						# this is a parallel link. Calculate node offsets
-						offsets = get_offsets(node.position, links[neighbour])
-						offsets2 = get_offsets(neighbour.position, links[neighbour])
-						conf_template += (('LINK MN%s-%s-%s-%d\n\t' +
-								'NODES MN%s:%d:%d  MN%s:%d:%d\n\t' +
-								'TARGET %s\n') % (
-									node.address, interface,
-									neighbour.address, links[neighbour],
-									node.address, offsets[0], offsets[1]),
-									neighbour.address, offsets2[0], offsets2[1],
-									rrd_file)
-									# we'll used straight lines for now
-									#'\tVIA ' + position1 + '\n')
-
-					if config.ShowBandwidth:
-						conf_template += ('\tBANDWIDTH ' + `config.Bandwidth` + 'K\n')
-					conf_template += ('\n')
+						# Is this a parallel link? 0 = first link, >=1 = parallel
+						if links[neighbour] == 1:
+							conf_template += (('LINK MN%s-%s-%s\n\t' +
+									'NODES MN%s MN%s\n\t' +
+									'TARGET %s\n') %
+										(node.address, interface, neighbour.address,
+										node.address, neighbour.address,
+										rrd_file))
+							
+						else:
+							# this is a parallel link. Calculate node offsets
+							#offsets = get_offsets(node.position, links[neighbour])
+							#offsets2 = get_offsets(neighbour.position, links[neighbour])
+							position = get_intermediate(node.position, neighbour.position, links[neighbour])
+							
+							conf_template += (('LINK MN%s-%s-%s-%d\n\t' +
+									#'NODES MN%s:%d:%d  MN%s:%d:%d\n\t' +
+									'NODES MN%s MN%s\n\t' +
+									'TARGET %s\n'
+									+'\tVIA %d %d\n'
+									) % (
+										node.address, interface,
+										neighbour.address, links[neighbour],
+										#node.address, offsets[0], offsets[1],
+										#neighbour.address, offsets2[0], offsets2[1],
+										node.address, neighbour.address,
+										rrd_file,
+										position[0], position[1]
+										))
+										# we'll used straight lines for now
+										#'\tVIA ' + position1 + '\n')
+	
+						if config.ShowBandwidth:
+							conf_template += ('\tBANDWIDTH ' + `config.Bandwidth` + 'K\n')
+						conf_template += ('\n')
 					
 			# write to config file
 			f = open('weathermap.conf', 'w')
@@ -152,16 +161,30 @@ class WeathermapThread(threads.MonitorThread):
 def get_intermediate(node1, node2, offset):
 	""" Calculate an intermediate position for VIA links
 		:param offset: Offset factor to increase the distance of the positions"""
-	
 	logging.debug('Getting intermediate node for ' + str(node1) + ' ' + str(node2))
 	
-	x = (node1[0] + node2[0])/2
-	y = (node1[1] + node2[1])/2
+	#x = (node1[0] + node2[0])/2
+	#y = (node1[1] + node2[1])/2
+	#
+	#if abs(node1[0] - node2[0]) <  abs(node1[1] - node2[1]):
+	#	return (x - 20 * offset, y), (x + 20 * offset, y)
+	#else:
+	#	return (x, y - 20 * offset), (x, y + 20 * offset)
 	
-	if abs(node1[0] - node2[0]) <  abs(node1[1] - node2[1]):
-		return (x - 20 * offset, y), (x + 20 * offset, y)
-	else:
-		return (x, y - 20 * offset), (x, y + 20 * offset)
+	if node1[0] == node2[0]:
+		x = node1[0]
+		y = abs(node1[1] - node2[1])/2 + min(node1[1], node2[1])
+		return offset % 2 == 1 and (x - 20 * offset, y) or (x + 20 * offset, y)
+		
+	if node1[1] == node2[1]:
+		y = node1[1]
+		x = abs(node1[0] - node2[0])/2 + min(node1[0], node2[0])
+		return offset % 2 == 1 and (x, y - 20 * offset) or (x, y + 20 * offset)
+		
+	x = abs(node1[0] - node2[0])/2 + min(node1[0], node2[0])
+	y = abs(node1[1] - node2[1])/2 + min(node1[1], node2[1])
+	
+	return offset % 2 == 1 and (x, y) or (x, y)
 	
 def get_offsets(node, offset):
 	""" Calculate an intermediate position for VIA links

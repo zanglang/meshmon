@@ -104,5 +104,29 @@ class GraphingThread(threads.MonitorThread):
 					'GPRINT:outbitsmax:MAX:%5.1lf %sbps\\n',
 					'COMMENT:  Last Updated.......\\: ' + asctime().replace(':','\\:')
 				)
+				
+				rrdtool.graph(self.img_files[index].replace('.png','-wifi.png'),
+					'-s -1' + config.GraphInterval,	# hour
+					'-t', '%s %s hourly (1 minute average)' % (self.node.address,
+								self.node.interfaces[index]),
+					'-h', '70',
+					'-w', '350',
+					'-a', config.ImgFormat,
+					'-v', 'Wireless stats',
+					'--x-grid', 'HOUR:1:HOUR:3:HOUR:3:0:%b %d %H:00',
+					'DEF:l=' + rrd_file + ':link:AVERAGE',
+					'DEF:s=' + rrd_file + ':signal:AVERAGE',
+					'DEF:n=' + rrd_file + ':noise:AVERAGE',
+					'LINE1:l#00FF00:Link Quality',
+					'LINE1:s#FF0000:Signal Level\j',
+					'LINE1:n#0000FF:Noise Level',
+					'GPRINT:l:LAST:Last Link Quality\:%3.0lf/100',
+					'GPRINT:n:LAST:Last Noise Level\:   %3.0lf/100',
+					'GPRINT:l:AVERAGE:Average Link Quality\:%3.0lf/100',
+					'GPRINT:n:AVERAGE:Average Noise Level\:%3.0lf/100',
+					'GPRINT:s:LAST:Last Signal\:%3.0lf dBm\j',
+					'GPRINT:s:AVERAGE:Average Signal\:      %3.0lf dBm')
+	
 			except rrdtool.error, e:
 				logging.error(e)
+				

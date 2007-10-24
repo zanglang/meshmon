@@ -33,12 +33,12 @@ def assign(address, position):
 	
 	global width, height
 	# adjust horizantal
-	print position[0]
 	if position[0] > width + hmargin:
 		width = position[0] + hmargin
 		print 'Adjusting width to', width, 'for', position
 	if position[1] > height + vmargin:
 	 	height = position[1] + vmargin
+	 	print 'Adjusting heigh to', height, 'for', position
 
 
 def add(node):

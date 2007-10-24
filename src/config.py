@@ -14,11 +14,15 @@ from string import Template
 #--------
 
 # Debug output (= True) or no debug output (= False)
-Debug = True
+Debug = False
 
 #------------
 # Monitoring
 #------------
+
+# Main plugin to use. Plugins determine the setup of gatherers and renderers
+# to deploy. Default: 'RrdTool' or 'Simulation'
+MainPlugin = 'Simulation'
 
 # A tuple collection of the mobile nodes where traffic data should be collected from
 # Example: '192.168.0.1', '127.0.0.1'
@@ -37,7 +41,7 @@ SnmpVersion = '2c'
 Community = 'public'
 
 # Interval for collecting traffic data in seconds
-TrafficInterval = 1
+TrafficInterval = 5
 
 #-----------------
 # Network Topology
@@ -111,6 +115,10 @@ ImgTemplate = Template('$imgdir/$host-$if.$ext')
 # For trafficmon, records random flunctuating traffic in RRDtool
 # Should be used for development purposes only!
 Simulate = False
+
+# Graceful shutdown waits for all threads to stop before quitting the program
+# Recommended, obviously, but may be turned off for development
+GracefulShutdown = False
 
 #-----------
 # Web Server

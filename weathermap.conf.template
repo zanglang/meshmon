@@ -17,7 +17,7 @@ TIMEPOS $timepos Last Updated: %b %d %Y %H:%M:%S
 #LINKWIDTH 4
 
 # HTML file
-#HTMLFILE $imgdir/weathermap.html
+HTMLOUTPUTFILE html/weathermap.html
 
 # label of TITLE
 TITLE Mesh Router Topology Map

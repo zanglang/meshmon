@@ -90,7 +90,9 @@ class AodvThread(threads.MonitorThread):
 							logging.error(e)
 						
 				# add gateway as neighbouring node to target
-				target.neighbours[gateway] = entry['interface']
+				if not target.neighbours.has_key(gateway):
+					target.neighbours[gateway] = []
+				target.neighbours[gateway].append(entry['interface'])
 				
 				# add interfaces to node
 				if entry['interface'] not in target.interfaces:
