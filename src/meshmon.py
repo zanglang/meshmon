@@ -6,7 +6,7 @@ Version 0.1 - Jerry Chong <zanglang@gmail.com>
 """
 
 import logging, sys
-import config, nodes, threads, webserver
+import config, nodes, threads, topology, webserver
 
 if (config.Debug):
 	logging.basicConfig(level=logging.DEBUG)
@@ -17,9 +17,12 @@ if __name__ == "__main__":
 	
 	backend = None
 	try:
-		# Initialize backends. This is currently hardcoded as we only
-		# have one method to gather and render data at the moment
-		MODULE = config.MainPlugin
+		# Initialize backends
+		if len(sys.argv) > 1:
+			MODULE = sys.argv[1]
+		else:
+			MODULE = config.MainPlugin
+			
 		backend = __import__('plugins.' + MODULE)
 		plugin = backend.__dict__[MODULE]
 		if not plugin.__dict__.has_key('initialize') or \
@@ -32,8 +35,11 @@ if __name__ == "__main__":
 		sys.exit()
 	print 'Loaded plugin', plugin.PLUGIN_INFO['NAME']
 	
-	# run monitors
 	try:
+	
+		# set up topology
+		topology.initialize()
+		
 		# initialize interface indices for monitored nodes
 		# These are router nodes which we have explicitly pointed out to be polled
 		for node in config.Nodes:
@@ -44,10 +50,13 @@ if __name__ == "__main__":
 			n.type = nodes.ROUTER
 			nodes.add(n)
 		
+		# do any processing defined by plugin
 		plugin.initialize()
-		# BUG: web.py blocks here!
-		webserver.start()
 		
+		# start web server
+		threads.add(webserver.WebThread())
+		
+		# print thread pool status
 		num_threads = threads.size()
 		if num_threads > 0:
 			print str(num_threads), 'threads executing...'

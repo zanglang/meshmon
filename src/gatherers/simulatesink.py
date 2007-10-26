@@ -17,17 +17,18 @@ NODES = {
 			'ath3': '192.168.1.2',
 			'ath4': '192.168.1.4',
 			'ath5': '192.168.1.5'
-		},
-		'positions': (100, 100)
+		}
 	},
 	'192.168.1.2': {
 		'neighbours': {
 			'ath3': '192.168.1.1',
 			'ath4': '192.168.1.5',
 			'ath5': '192.168.1.3'
-		},
-		'positions': (300, 100)
-	},
+		}
+	}
+}
+
+_X = {
 	'192.168.1.4': {
 		'neighbours': {
 			'ath4': '192.168.1.1',
@@ -44,6 +45,13 @@ NODES = {
 		},
 		'positions': (300, 300)
 	},
+	'192.168.1.6': {
+		'neighbours': {
+			'ath5': '192.168.1.2',
+			'ath6': '192.168.1.3'
+		},
+		'positions': (500, 300)
+	},
 	'192.168.1.7': {
 		'neighbours': {
 			'ath4': '192.168.1.4',
@@ -59,17 +67,6 @@ NODES = {
 			'ath3': '192.168.1.9'
 		},
 		'positions': (300, 500)
-	}
-}
-
-_X = {
-	
-	'192.168.1.6': {
-		'neighbours': {
-			'ath5': '192.168.1.2',
-			'ath6': '192.168.1.3'
-		},
-		'positions': (500, 300)
 	},
 	'192.168.1.9': {
 		'neighbours': {
@@ -80,6 +77,15 @@ _X = {
 	}
 }
 
+config.NodePositions = {
+	'192.168.1.1' : (100, 100),
+	'192.168.1.2' : (300, 100),
+	'192.168.1.4' : (100, 300),
+	'192.168.1.5' : (300, 300),
+	'192.168.1.7' : (100, 500),
+	'192.168.1.8' : (300, 500),
+}
+
 def populate():
 	for address, details in NODES.items():
 		# add node to nodes list
@@ -88,13 +94,13 @@ def populate():
 			node = nodes.create(address)
 			nodes.add(node)
 		node.type = nodes.ROUTER
-		
+
 		# temporary neighbours store
 		node._neighbours = []
 		# actual store for current neighbours
 		node.neighbours = {}
 		# number of rrdtool databases used
-		node.rrd_files = []
+		node.rrd_files = {}
 		# keep track of incoming/outgoing traffic
 		node.in_octets = {}
 		node.out_octets = {}
@@ -102,11 +108,10 @@ def populate():
 		node.linklevel = 50 + random.randint(-25,25)
 		node.signallevel = 50 + random.randint(-25,25)
 		node.noiselevel = 10
-		
+
 		# assign node positions
-		topology.assign(node.address, details['positions'])
-		node.position = details['positions']
-		
+		# topology.assign(node, details['positions'])
+
 		# initialize interfaces and neighbouring links
 		for interface, neighbour in details['neighbours'].items():
 			if neighbour not in NODES.keys():
@@ -115,24 +120,24 @@ def populate():
 			if nnode == None:
 				nnode = nodes.create(neighbour)
 				nodes.add(nnode)
-			
+
 			# update node's neighbours and initial connections
 			node.neighbours[nnode] = [interface]
 			node._neighbours.append(nnode)
-			
+
 			if interface not in node.interfaces:
 				node.interfaces.append(interface)
-				
+
 				# check path to rrdtool database
 				rrd_file = config.RrdTemplate.substitute({
 					'dir': config.RrdPath,
 					'host': node.address,
 					'if': interface
 				})
-				
-				if rrd_file in node.rrd_files:
+
+				if rrd_file in node.rrd_files.values():
 					continue
-				
+
 				if not os.path.exists(rrd_file):
 					print 'Creating RRDtool database at ' + `rrd_file`
 					try:
@@ -158,13 +163,13 @@ def populate():
 						raise Exception, 'Unable to create RRDtool database!'
 				else:
 					print node.address, 'using RRDtool database at ', rrd_file
-				node.rrd_files.append(rrd_file)
-				
+				node.rrd_files[interface]  = rrd_file
+
 		node.interfaces.sort()
 		node._neighbours.sort(lambda nodex, nodey:
 				nodex.address < nodey.address and -1 or 1)
 
-				
+
 class SimulatorThread(threads.MonitorThread):
 	""" Thread for generating simulated data """
 
@@ -172,21 +177,21 @@ class SimulatorThread(threads.MonitorThread):
 		super(SimulatorThread, self).__init__()
 		self.func = self.loop_simulate
 		self.interval = config.TrafficInterval
-		
+
 	def loop_simulate(self):
 		for node in nodes.collection:
 			node.neighbours.clear()
-	
+
 		for node in nodes.collection:
 			logging.debug('loop_simulate for ' + `node.address`)
-			
+
 			# pick random neighbours matched with interfaces
 			nnodes = []
 			chose = 0
 			for num in xrange(random.randint(0, len(node.interfaces))):
 				random_node = random.choice(node._neighbours)
 				nnodes.append(random_node)
-			
+
 			ninterfaces = random.sample(node.interfaces,
 					len(nnodes))
 			# clear the neighbours dictionary
@@ -198,33 +203,33 @@ class SimulatorThread(threads.MonitorThread):
 				if not node.neighbours.has_key(n):
 					node.neighbours[n] = []
 				node.neighbours[n].append(ninterfaces[index])
-				
+
 			# 128 kbytes upstream/64 downstream
-			for index, rrd_file in enumerate(node.rrd_files):
-				
+			for rrd_file in node.rrd_files.values():
+
 				if not node.in_octets.has_key(rrd_file):
 					node.in_octets[rrd_file] = 0
 				if not node.out_octets.has_key(rrd_file):
 					node.out_octets[rrd_file] = 0
-					
+
 				in_octets = random.randint(0, 128000)
 				out_octets = random.randint(0, 64000)
-				
+
 				adjust = random.randint(0, 100)
 				if adjust < 25:
 					in_octets /= 1000
 				elif adjust < 80:
 					in_octets /= 2
-					
+
 				adjust = random.randint(0, 100)
 				if adjust < 25:
 					out_octets /= 1000
 				elif adjust < 80:
 					out_octets /= 2
-					
+
 				node.in_octets[rrd_file] += in_octets
 				node.out_octets[rrd_file] += out_octets
-				
+
 				# update wireless
 				link = node.linklevel + random.randint(-10,10)
 				signal = node.signallevel + random.randint(-10,10)
@@ -233,7 +238,7 @@ class SimulatorThread(threads.MonitorThread):
 						'link:%d signal:%d noise:%d' %
 						(node.in_octets[rrd_file], node.out_octets[rrd_file],
 						link, signal, noise))
-			
+
 				# push the generated numbers into rrdtool
 				try:
 					rrdtool.update(rrd_file,

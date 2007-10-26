@@ -1,6 +1,6 @@
 __doc__ = """
 MeshMon RRDtool/SNMP plugin
-version 0.1 - Jerry Chong <zanglang@gmail.com> 
+version 0.1 - Jerry Chong <zanglang@gmail.com>
 """
 
 import config, logging, nodes, threads
@@ -20,11 +20,11 @@ def initialize():
 	gatherers.simulatesink.populate()
 	logging.debug('Starting simulator thread')
 	threads.add(gatherers.simulatesink.SimulatorThread())
-	
+
 	for node in nodes.collection:
 		if (node.type == nodes.ROUTER):
-			logging.debug('Starting graphing thread for ' + `node.address`)		
+			logging.debug('Starting graphing thread for ' + `node.address`)
 			threads.add(rendering.rrd.GraphingThread(node))
-							
+
 	logging.debug('Starting weathermap thread')
 	threads.add(rendering.weathermap.WeathermapThread())

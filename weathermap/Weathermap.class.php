@@ -5357,7 +5357,8 @@ function MakeHTML($imagemapname = "weathermap_imap")
 
 	$html='';
 
-	$html .= '<div class="weathermapimage" style="margin-left: auto; margin-right: auto; width: '.$this->width.'px;" >';
+	// (Changed by Jerry: only need the centre HTML fragment)
+	/*$html .= '<div class="weathermapimage" style="margin-left: auto; margin-right: auto; width: '.$this->width.'px;" >';
 	if ($this->imageuri != '') { $html.=sprintf(
 		'<img src="%s" width="%s" height="%s" border="0" usemap="#'
 		. $imagemapname . '" alt="network weathermap" />',
@@ -5370,7 +5371,7 @@ function MakeHTML($imagemapname = "weathermap_imap")
 		$this->imagefile,
 		$this->width,
 		$this->height); }
-	$html .= '</div>';
+	$html .= '</div>';*/
 
 	$html.='<map name="' . $imagemapname . '" id="' . $imagemapname . '">';
 

@@ -22,12 +22,8 @@ def initialize():
 	
 	for node in nodes.collection:
 		if (node.type == nodes.ROUTER):
-			if not config.Simulate:
-				logging.debug('Starting SNMP poll thread for ' + `node.address`)
-				threads.add(gatherers.rrdsink.GathererThread(node))	
-			else:
-				logging.debug('Starting simulated SNMP thread for ' + `node.address`)
-				threads.add(gatherers.rrdsink.SimulationGathererThread(node))
+			logging.debug('Starting SNMP poll thread for ' + `node.address`)
+			threads.add(gatherers.rrdsink.GathererThread(node))
 				
 			logging.debug('Starting graphing thread for ' + `node.address`)
 			threads.add(rendering.rrd.GraphingThread(node))

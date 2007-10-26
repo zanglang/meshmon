@@ -21,49 +21,49 @@ class GraphingThread(threads.MonitorThread):
 		self.node = node
 		self.num_interfaces = 0
 		self.refresh_interfaces()
-		
+
 	def refresh_interfaces(self):
 		""" Initialize the RRDtool images depending on interfaces this node will use """
-		
+
 		for interface in self.node.interfaces:
 			rrd_file = config.RrdTemplate.substitute({
 				'dir': config.RrdPath,
 				'host': self.node.address,
 				'if': interface
 			})
-			
+
 			if rrd_file in self.rrd_files:
 				continue
 			self.rrd_files.append(rrd_file)
-			
+
 			img = config.ImgTemplate.substitute({
 				'imgdir': config.ImgPath,
 				'host': self.node.address,
 				'if': interface,
 				'ext': config.ImgFormat.lower()
 			})
-			
+
 			self.img_files.append(img)
 			print 'Creating graph at ' + `img`
-			
+
 		# record the interfaces used now for future reference
 		self.num_interfaces = len(self.node.interfaces)
-		
+
 	def draw_graph(self):
 		""" Draw RRDtool graph """
 
 		from time import asctime
 		logging.debug("draw_graph")
-		
+
 		# has more interfaces been detected?
 		if (self.node.interfaces > self.num_interfaces):
 			self.refresh_interfaces()
-		
+
 		for index, rrd_file in enumerate(self.rrd_files):
 			if not os.path.exists(rrd_file):
 				logging.error('RRD file %s does not exist?' % rrd_file)
 				continue
-			
+
 			try:
 				rrdtool.graph(self.img_files[index],
 					'-s -1' + config.GraphInterval,	# hour
@@ -104,7 +104,7 @@ class GraphingThread(threads.MonitorThread):
 					'GPRINT:outbitsmax:MAX:%5.1lf %sbps\\n',
 					'COMMENT:  Last Updated.......\\: ' + asctime().replace(':','\\:')
 				)
-				
+
 				rrdtool.graph(self.img_files[index].replace('.png','-wifi.png'),
 					'-s -1' + config.GraphInterval,	# hour
 					'-t', '%s %s hourly (1 minute average)' % (self.node.address,
@@ -126,7 +126,6 @@ class GraphingThread(threads.MonitorThread):
 					'GPRINT:n:AVERAGE:Average Noise Level\:%3.0lf/100',
 					'GPRINT:s:LAST:Last Signal\:%3.0lf dBm\j',
 					'GPRINT:s:AVERAGE:Average Signal\:      %3.0lf dBm')
-	
+
 			except rrdtool.error, e:
 				logging.error(e)
-				

@@ -19,6 +19,9 @@ TIMEPOS $timepos Last Updated: %b %d %Y %H:%M:%S
 # HTML file
 HTMLOUTPUTFILE html/weathermap.html
 
+# HTML generate style
+HTMLSTYLE overlib
+
 # label of TITLE
 TITLE Mesh Router Topology Map
 # Position of title in graph

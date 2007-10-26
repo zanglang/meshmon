@@ -8,7 +8,7 @@ import re, sys
 def parse(text):
 	""" Parse a text block and returns a dictionary array of AODV information
 	:param text: text block containing AODV metadata """
-	
+
 	# compile regex
 	# Example: 10.0.1.1	10.0.1.1	ath0	a	50	1024	2	V
 	pattern = re.compile('^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+' +	# destination
@@ -19,16 +19,16 @@ def parse(text):
 			'(\d+)\s+' +		# bytes/sec
 			'(\d+)\s*' +		# packets/sec
 			'(\w+)?')		# flag
-	
+
 	# digest text file into AODV links to neighbouring nodes
 	entries = []
 	for line in text.split('\n'):
-		
-		line = line.strip()		
+
+		line = line.strip()
 		result = pattern.match(line)
 		if result is None:
 			continue
-		
+
 		entry = result.groups()
 		entries.append({
 			'destination': entry[0],
@@ -40,8 +40,9 @@ def parse(text):
 			'packets': entry[6],
 			'flag': entry[7]
 		})
-		
+
 	return entries
+
 
 #------------------------------------------------------------------------------
 def parse_proc_file(filename):
@@ -52,15 +53,16 @@ def parse_proc_file(filename):
 	except IOError:
 		print 'Could not open ' + filename + ', aborting!'
 		return None
-	
+
 	# skip the first line/file descriptive header
 	f.readline()
-		
+
 	# read contents of file and pass to the parsing function
 	text = f.read()
 	entries = parse(text)
-	f.close()	
+	f.close()
 	return entries
+
 
 #------------------------------------------------------------------------------
 if __name__ == "__main__":

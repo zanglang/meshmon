@@ -14,7 +14,7 @@ from string import Template
 #--------
 
 # Debug output (= True) or no debug output (= False)
-Debug = False
+Debug = True
 
 #------------
 # Monitoring
@@ -22,11 +22,11 @@ Debug = False
 
 # Main plugin to use. Plugins determine the setup of gatherers and renderers
 # to deploy. Default: 'RrdTool' or 'Simulation'
-MainPlugin = 'Simulation'
+MainPlugin = 'RrdTool'
 
 # A tuple collection of the mobile nodes where traffic data should be collected from
 # Example: '192.168.0.1', '127.0.0.1'
-#Nodes = ('10.0.0.1','10.0.0.5','10.0.0.7')
+#Nodes = ('192.168.0.50',)
 Nodes = []
 
 # A list of the interfaces to be monitored (separate by comma if more than one)
@@ -41,20 +41,23 @@ SnmpVersion = '2c'
 Community = 'public'
 
 # Interval for collecting traffic data in seconds
-TrafficInterval = 5
+TrafficInterval = 3
 
 #-----------------
 # Network Topology
 #-----------------
 
 # Dynamically calculate topology
-DynamicTopology = False
+DynamicTopology = True
 
-# Load node coordinates from file using plugins. Automatically disabled
-# if DynamicTopology is enabled
-# Format: ('<plugin>', '<file path>')
+# Additional configuration for topology.
+# 	Using the 'config' setting lets topology.py to initialize nodes'
+#	positions from a Python dict first.
+# Default: Read from config.NodePositions. Leave path as None, or replace it
+#	with a dictionary structure
+# Format: ('<plugin/definitions type>', '<file path>')
 # Example: ('static', 'coords.txt')
-TopologySettings = (None, None)
+TopologySettings = ('config', None)
 
 # Weathermap output file
 TopologyImg = 'weathermap.png'
@@ -63,10 +66,11 @@ TopologyImg = 'weathermap.png'
 TopologyConf = 'weathermap.conf'
 
 # Whether traffic data is shown
-ShowBandwidth = True
+# Available options: percent, bits, interface, none
+ShowBandwidthLabel = 'percent'
 
 # Network backbone bandwidth (kilobits)
-Bandwidth = 1024
+Bandwidth = 128
 
 #---------
 # RRDtool
@@ -111,11 +115,6 @@ ImgTemplate = Template('$imgdir/$host-$if.$ext')
 # Testing
 #---------
 
-# Simulate network traffic for when it's impossible to run on a live system
-# For trafficmon, records random flunctuating traffic in RRDtool
-# Should be used for development purposes only!
-Simulate = False
-
 # Graceful shutdown waits for all threads to stop before quitting the program
 # Recommended, obviously, but may be turned off for development
 GracefulShutdown = False
@@ -126,3 +125,11 @@ GracefulShutdown = False
 
 # Change the port of the internal web server (default: 8080)
 WebServerPort = 8081
+
+#---------------
+# Extra Settings
+#---------------
+
+# preset node positions in pixels
+# Example: {'192.168.0.1': (100,100)}
+NodePositions = {}

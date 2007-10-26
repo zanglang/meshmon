@@ -29,8 +29,8 @@ class _Node:
 		self.neighbours = {}
 		self.position = ()
 		self.type = UNKNOWN
-		
-		
+
+
 def add(target):
 	""" Add nodes for collection """
 	collection.append(target)
@@ -45,11 +45,10 @@ def create(target):
 	logging.debug('Creating new node instance for ' + target)
 	return _Node(target)
 
-	
+
 def find(target):
 	""" Find the node in collection with the given IP address """
 	for n in collection:
 		if n.address == target:
 			return n
 	return None
-	

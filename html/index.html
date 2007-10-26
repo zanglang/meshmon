@@ -1,11 +1,11 @@
-$def with (files, interval)
+$def with (files, interval, imagemap)
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <link href="iamrice.css" media="screen" rel="Stylesheet" type="text/css" />
-<title>Insert title here</title>
+<title>MeshMon - Wireless Mesh Monitoring System</title>
 <style>
 </style>
 <script type="text/javascript" src="prototype.js"></script>
@@ -53,13 +53,12 @@ $def with (files, interval)
 		timer = setTimeout('refresh()', interval);
 	}
 	
-	function changeInterval() {
-		var ele = \$('intervals');
-		interval = (ele[ele.selectedIndex]).value * 1000;
+	function updateOptions(ele) {
+		param = (ele[ele.selectedIndex]).value;
 		if (timer != null)
 			clearTimeout(timer);
 		
-		\$('mainform').action = 'update?interval=' + interval
+		\$('mainform').action = 'update?' + ele.id + '=' + param
 		\$('mainform').submit()
 	}
 	
@@ -94,30 +93,54 @@ $def with (files, interval)
 </script>
 </head>
 <body onload="init()">
+$:imagemap
 <form id='mainform' method='POST' />
 <div id="container" class="clearfix"><br />
 <br />
 <div id="content" class="clearfix">
 <div id="main">
-<img id="weathermap" />
+<img id="weathermap" usemap='weathermap_imap' />
 <br/>
 <br/>
-Refresh interval:<br/>
-<select id="intervals" onchange="changeInterval()">
-	<option>---</option>
-	<option value="1">1</option>
-	<option value="5">5</option>
-	<option value="10">10</option>
-	<option value="30">30</option>
-	<option value="60">60</option>
-</select>
-<br/><br/>
-Statistics View:<br/>
-<select id="statistics" onchange="changeView()">
-	<option>---</option>
-	<option value="0">Traffic</option>
-	<option value="1">Wireless Signal</option>
-</select>
+<table style='border: 0px;'>
+<tr>
+	<td>
+	Refresh interval:<br/>
+	<select id="interval" onchange="updateOptions(this)">
+		<option>---</option>
+		<option value="1000">1</option>
+		<option value="3000">3</option>
+		<option value="5000">5</option>
+		<option value="10000">10</option>
+		<option value="20000">20</option>
+		<option value="30000">30</option>
+		<option value="60000">60</option>
+	</select>
+	</td>
+	<td>
+	Statistics View:<br/>
+	<select id="view" onchange="updateOptions(this)">
+		<option>---</option>
+		<option value="0">Traffic</option>
+		<option value="1">Wireless Signal</option>
+	</select>
+	</td>
+</tr>
+<tr>
+	<td>
+	</td>
+	<td>
+	Topology Options:<br/>
+	<select id="weathermap" onchange="updateOptions(this)">
+		<option>---</option>
+		<option value="percent">Show Bandwidth Usage</option>
+		<option value="bits">Show Data Rate</option>
+		<option value="interface">Show Interfaces</option>		
+		<option value="none">Do not show</option>
+	</select>
+	</td>
+</tr>
+</table>
 </div>
 <div id="sidebar">
 	<br/>
