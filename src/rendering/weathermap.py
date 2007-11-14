@@ -61,7 +61,7 @@ class WeathermapThread(threads.MonitorThread):
 				'height': int(topology.height),
 				'imgdir': config.ImgPath,
 				'int': config.GraphInterval,
-				'keypos': str(int(topology.width * 0.75)) + ' 15',
+				'keypos': str(topology.width - 130) + ' 15',
 				'timepos': str(topology.width - 210) + ' ' + str(topology.height - 5),
 				'topologyimg': config.TopologyImg + '.tmp',
 				'width': int(topology.width)
@@ -133,7 +133,7 @@ class WeathermapThread(threads.MonitorThread):
 									config.ShowBandwidthLabel)
 							conf_template += ('\tBWLABELPOS 70 30\n')
 
-						conf_template += ('\tBANDWIDTH %dK\n' % config.Bandwidth)
+						conf_template += ('\tBANDWIDTH %d\n' % config.Bandwidth)
 						conf_template += ('\tOVERLIBGRAPH images/%s\n' %
 								rrd_file.replace('.rrd', '.' +
 								config.ImgFormat.lower()))
@@ -184,7 +184,12 @@ def get_intermediate(node1, node2, offset):
 	x = abs(node1[0] - node2[0])/2 + min(node1[0], node2[0])
 	y = abs(node1[1] - node2[1])/2 + min(node1[1], node2[1])
 
-	return offset % 2 == 1 and (x, y) or (x, y)
+	logging.debug('Intermediate: ' + str(x) + ' ' + str(y))
+	result = offset % 2 == 1 \
+			and (x - 20 * offset, y - 20 * offset) \
+			or (x + 20 * offset , y + 20 * offset)
+	logging.debug('Result: ' + str(result))
+	return result
 
 
 

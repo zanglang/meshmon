@@ -92,10 +92,12 @@ class GraphingThread(threads.MonitorThread):
 					'CDEF:outbitsinvaverage=outbitsaverage,-1,*',
 					'CDEF:outbitsinvmax=outbitsmax,-1,*',
 					'AREA:inbitsaverage#0000FF:In (last/avg/max)..\\:',
-					'LINE1:inbitsmax',
 					'GPRINT:inbitslast:LAST:%5.1lf %sbps',
 					'GPRINT:inbitsaverage:AVERAGE:%5.1lf %sbps',
 					'GPRINT:inbitsmax:MAX:%5.1lf %sbps\\n',
+					'LINE1:inbitsmax',
+					'LINE1:inlast',
+					'LINE1:inaverage',
 					'AREA:outbitsinvaverage#00FF00:Out (last/avg/max).\\:',
 					#'LINE1:outbitsinvmax#FF0000',	# set colour of highest watermark
 					'LINE1:outbitsinvmax',

@@ -105,7 +105,7 @@ $:imagemap
 <table style='border: 0px;'>
 <tr>
 	<td>
-	Refresh interval:<br/>
+	Change monitor interval:<br/>
 	<select id="interval" onchange="updateOptions(this)">
 		<option>---</option>
 		<option value="1000">1</option>
@@ -118,7 +118,7 @@ $:imagemap
 	</select>
 	</td>
 	<td>
-	Statistics View:<br/>
+	Toggle RRDtool view:<br/>
 	<select id="view" onchange="updateOptions(this)">
 		<option>---</option>
 		<option value="0">Traffic</option>
@@ -130,7 +130,7 @@ $:imagemap
 	<td>
 	</td>
 	<td>
-	Topology Options:<br/>
+	Toggle link statistics:<br/>
 	<select id="weathermap" onchange="updateOptions(this)">
 		<option>---</option>
 		<option value="percent">Show Bandwidth Usage</option>

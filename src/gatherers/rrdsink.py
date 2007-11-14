@@ -7,6 +7,7 @@ Based on meshtraffic.pl by Dirk Lessner, National ICT Australia
 
 import logging, os, random, rrdtool
 import aodv, config, nodes, snmp, threads, wifi
+import rendering.rrd
 
 # Look up OIDs for in/out octets
 InOctets = snmp.load_symbol('IF-MIB', 'ifInOctets')
@@ -16,7 +17,11 @@ OutOctets = snmp.load_symbol('IF-MIB', 'ifOutOctets')
 random.seed()
 
 # cache for UCD-SNMP-MIB::ext*
-execResults = None
+execResults = {}
+
+# cache for parsed AODV
+aodvResults = {}
+
 
 #-------------------------------------------------------------------------------
 class AodvThread(threads.MonitorThread):
@@ -28,6 +33,7 @@ class AodvThread(threads.MonitorThread):
 		self.interval = config.TrafficInterval
 
 	def loop_aodv(self):
+
 		for target in nodes.collection:
 
 			# BUG: (maybe?) if a node does not have SNMP there's no way
@@ -35,24 +41,46 @@ class AodvThread(threads.MonitorThread):
 			if target.type != nodes.ROUTER:
 				continue
 
+			# first, reset neighbours list so we can redetect links
+			target.neighbours = {}
+
 			############
 			text = None
 			global execResults
+			logging.debug('loop_aodv for %s' % target.address)
+			
 			try:
-				execResults = snmp.walk(target.address, (1,3,6,1,4,1,2021,8))
+				execResults[target.address] = \
+						snmp.walk(target.address, (1,3,6,1,4,1,2021,8))
+				# try and increase interval
+				if self.interval > 10:
+					self.interval -= 1
+
 			except Exception, e:
 				logging.error('Unable to get AODV output for ' +
 					`target.address` + ': ' + `e`)
+
+				# try and reduce traffic interval
+				if self.interval < 30:
+					self.interval += 1
 				continue
 
-			aodv_entries = aodv.parse(str(execResults[8][0][1]))
-			for entry in aodv_entries:
+			target.aodv_data = \
+					aodv.parse(str(execResults[target.address][8][0][1]))
+			target.wifi_data = \
+					wifi.parse(str(execResults[target.address][9][0][1]))
+
+			for interface in target.aodv_data:
+				# fetch entry for this link
+				entry = target.aodv_data[interface]
+				destaddress = entry['destination']
+
 				# check if it already exists
-				dest = nodes.find(entry['destination'])
+				dest = nodes.find(destaddress)
 
 				if dest == None:
 					# add newly discovered nodes to collection
-					dest = nodes.create(entry['destination'])
+					dest = nodes.create(destaddress)
 					nodes.add(dest)
 
 					try:
@@ -62,10 +90,17 @@ class AodvThread(threads.MonitorThread):
 						# no problems here. this destination supports SNMP
 						dest.type = nodes.ROUTER
 
+						logging.debug('Starting SNMP poll thread for ' + `dest.address`)
+						threads.add(GathererThread(dest))
+
+						logging.debug('Starting graphing thread for ' + `dest.address`)
+						threads.add(rendering.rrd.GraphingThread(dest))
+
 					except Exception, e:
 						if e.message == 'requestTimedOut':
 							# assume machine does not have SNM
 							# assume machine does not have SNMP?
+							logging.debug('PROBING %s has timed out!' % dest.address)
 							dest.type = nodes.GENERIC
 						else:
 							# we have a real error!
@@ -85,15 +120,16 @@ class AodvThread(threads.MonitorThread):
 						# no problems here. this gateway supports SNMP
 						gateway.type = nodes.ROUTER
 
-						logging.debug('Starting SNMP poll thread for ' + `node.address`)
-						threads.add(gatherers.rrdsink.GathererThread(node))
+						logging.debug('Starting SNMP poll thread for ' + `gateway.address`)
+						threads.add(GathererThread(gateway))
 
-						logging.debug('Starting graphing thread for ' + `node.address`)
-						threads.add(rendering.rrd.GraphingThread(node))
+						logging.debug('Starting graphing thread for ' + `gateway.address`)
+						threads.add(rendering.rrd.GraphingThread(gateway))
 
 					except Exception, e:
 						if e.message == 'requestTimedOut':
 							# assume machine does not have SNMP?
+							logging.debug('PROBING %s has timed out!' % gateway.address)
 							gateway.type = nodes.GENERIC
 						else:
 							# we have a real error!
@@ -102,12 +138,13 @@ class AodvThread(threads.MonitorThread):
 				# add gateway as neighbouring node to target
 				if not target.neighbours.has_key(gateway):
 					target.neighbours[gateway] = []
-				if entry['interface'] not in target.neighbours[gateway]:
-					target.neighbours[gateway].append(entry['interface'])
+
+				if interface not in target.neighbours[gateway]:
+					target.neighbours[gateway].append(interface)
 
 				# add interfaces to node
-				if entry['interface'] not in target.interfaces:
-					target.interfaces.append(entry['interface'])
+				if interface not in target.interfaces:
+					target.interfaces.append(interface)
 
 
 #-------------------------------------------------------------------------------
@@ -124,10 +161,11 @@ class GathererThread(threads.MonitorThread):
 		self.target = node
 		self.target.rrd_files = {}
 		self.num_interfaces = 0
-		self.refresh_interfaces()
 
-		# wireless information
-		self.wifi_data = {}
+		try:
+			self.refresh_interfaces()
+		except Exception, e:
+			logging.debug('Could not initialize interfaces: %s. Try later?' % e)
 
 	def refresh_interfaces(self):
 		""" Initialize the SNMP OIDs to poll depending on interfaces this node will use """
@@ -178,8 +216,8 @@ class GathererThread(threads.MonitorThread):
 						rrdtool.create(rrd_file,
 							#'-b now -60s',				# Start time now -1 min
 							'-s ' + `config.TrafficInterval`,	# interval
-							'DS:traffic_in:COUNTER:' + `config.TrafficInterval * 2` + ':0:3500000',
-							'DS:traffic_out:COUNTER:' + `config.TrafficInterval * 2` + ':0:3500000',
+							'DS:traffic_in:GAUGE:' + `config.TrafficInterval * 3` + ':U:U',
+							'DS:traffic_out:COUNTER:' + `config.TrafficInterval * 3` + ':U:U',
 							# wireless
 							'DS:link:GAUGE:120:U:U',
 							'DS:signal:GAUGE:120:U:U',
@@ -202,54 +240,92 @@ class GathererThread(threads.MonitorThread):
 		# record the interfaces used now for future reference
 		self.num_interfaces = len(self.target.interfaces)
 
+
 	def loop_snmp(self):
 		""" SNMP polling loop """
 
 		# has more interfaces been detected?
-		if (self.target.interfaces > self.num_interfaces):
-			self.refresh_interfaces()
+		try:
+			if (self.target.interfaces > self.num_interfaces):
+				self.refresh_interfaces()
+		except Exception, e:
+			logging.debug('Could not initialize interfaces: %s. Try later?' % e)
 
-		# poll wireless statistics
-		# Reuse SNMP cache filled in by the AODV thread
-		global execResults
-		self.target.wifi_data = wifi.parse(str(execResults[9][0][1]))
-
-		# FIXME: Warning - in/out Octets wrap back to 0. Is this handled properly?
 		logging.debug('loop_snmp for ' + `self.target.address`)
 
 		# interate through known interfaces
 		for interface in self.oids:
-			oids = self.oids[interface]
+			#oids = self.oids[interface]
 
+			#in_query = []
+			#out_query = []
+
+			# TODO: is this still required?
 			# get in/out octets for this interface
-			try:
-				in_query, out_query = \
-					snmp.get(self.target.address, oids[0]), \
-					snmp.get(self.target.address, oids[1])
-			except Exception, e:
-				logging.error('Could not poll in/out octets for ' +
-					`self.target.address` + ': ' + `e`)
-				continue
+			#try:
+			#	in_query, out_query = \
+			#		snmp.get(self.target.address, oids[0]), \
+			#		snmp.get(self.target.address, oids[1])
 
-			# if either is 0, it's possible an error occured!
-			if len(in_query) > 0 and len(out_query) > 0:
-				in_octets = in_query[0][1]
-				out_octets = out_query[0][1]
-				wifi_data = self.target.wifi_data[interface]
+			#	if self.interval > 10:
+			#		self.interval -= 1
 
-				logging.debug('Updating RRDtool in:%d out:%d '\
-						'link:%d signal:%d noise:%d' %
-						(in_octets, out_octets, wifi_data['link'],
-								wifi_data['signal'], wifi_data['noise']))
+			#except Exception, e:
+			#	logging.error('Could not poll in/out octets for ' +
+			#		`self.target.address` + ': ' + `e`)
 
+			#	# try and reduce interval by 1
+			#	if self.interval < 30:
+			#		self.interval += 1
+
+			#in_octets = len(in_query) > 0 \
+			#		and in_query[0][1] or 0
+
+			in_octets = 0
+			out_octets = 0
+			
+			if self.target.__dict__.has_key('aodv_data') and \
+					self.target.aodv_data.has_key(interface):
+				in_octets = int(self.target.aodv_data[interface]['received'])
+				out_octets = int(self.target.aodv_data[interface]['sent'])
+					
+				print 'in', in_octets, 'out', out_octets
+	
+				###########################
+				# Testing AODV cache : find AODV entry using the same interface
+	
 				# push results into rrdtool
 				try:
 					rrdtool.update(self.target.rrd_files[interface],
 						'-t',
-						'traffic_in:traffic_out:link:signal:noise',
-						'N:%d:%d:%d:%d:%d' % (in_octets, out_octets,
-								wifi_data['link'], wifi_data['signal'],
-								wifi_data['noise'])
+						'traffic_in:traffic_out',
+						'N:%d:%d' % (in_octets, out_octets)
 					)
+					print ('Updating RRDtool in:%d out:%d' %
+							(in_octets, out_octets))
 				except Exception, e:
 					logging.error(e)
+					
+			else:
+				logging.debug('No AODV data yet?')
+				
+			# push wifi results also
+			if self.target.__dict__.has_key('wifi_data') and \
+					self.target.wifi_data.has_key(interface):
+				try:
+					rrdtool.update(self.target.rrd_files[interface],
+						'-t',
+						'link:signal:noise',
+						'N:%d:%d:%d' % (self.target.wifi_data[interface]['link'],
+								self.target.wifi_data[interface]['signal'],
+								self.target.wifi_data[interface]['noise'])
+					)
+					print ('Updating RRDtool link:%d signal:%d noise:%d' %
+							(self.target.wifi_data[interface]['link'],
+							self.target.wifi_data[interface]['signal'],
+							self.target.wifi_data[interface]['noise']))
+				except Exception, e:
+					logging.error(e)
+					
+			else:
+				logging.debug('No wifi data yet?')

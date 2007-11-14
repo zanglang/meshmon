@@ -16,12 +16,12 @@ def parse(text):
 			'(\w{3,4}\d)\s+' +	# interface
 			'(\w)\s+' +			# 802.11 type
 			'(\d{1,2})\s+'		# channel
-			'(\d+)\s+' +		# bytes/sec
-			'(\d+)\s*' +		# packets/sec
+			'(\d+)\s+' +		# sent
+			'(\d+)\s*' +		# received
 			'(\w+)?')		# flag
 
 	# digest text file into AODV links to neighbouring nodes
-	entries = []
+	entries = {}
 	for line in text.split('\n'):
 
 		line = line.strip()
@@ -30,15 +30,16 @@ def parse(text):
 			continue
 
 		entry = result.groups()
-		entries.append({
+		# interface as key
+		entries[entry[2]] = ({
 			'destination': entry[0],
 			'gateway': entry[1],
-			'interface': entry[2],
-			'80211type': entry[3],
-			'channel': entry[4],
-			'bytes': entry[5],
-			'packets': entry[6],
-			'flag': entry[7]
+			#'interface': entry[2],
+			#'80211type': entry[3],
+			#'channel': entry[4],
+			'sent': entry[5],
+			'received': entry[6]
+			#'flag': entry[7]
 		})
 
 	return entries

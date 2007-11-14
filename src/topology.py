@@ -130,7 +130,8 @@ def add(node):
 		height = xheight
 		print 'Height adjusted to %d' % height
 
-	xwidth = (len(allocations[layer]) - 1) * buffer + hmargin * 2
+	xwidth = max((len(allocations[layer]) - 1) * buffer + hmargin * 2,
+			n.position[1] + hmargin)
 	if width < xwidth:
 		width = xwidth
 		print 'Width adjusted to %d' % width

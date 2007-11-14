@@ -26,8 +26,8 @@ MainPlugin = 'RrdTool'
 
 # A tuple collection of the mobile nodes where traffic data should be collected from
 # Example: '192.168.0.1', '127.0.0.1'
-#Nodes = ('192.168.0.50',)
-Nodes = []
+Nodes = ('192.168.0.50',)
+#Nodes = []
 
 # A list of the interfaces to be monitored (separate by comma if more than one)
 # Example: 'eth0', 'eth1
@@ -41,7 +41,7 @@ SnmpVersion = '2c'
 Community = 'public'
 
 # Interval for collecting traffic data in seconds
-TrafficInterval = 3
+TrafficInterval = 5
 
 #-----------------
 # Network Topology
@@ -67,10 +67,10 @@ TopologyConf = 'weathermap.conf'
 
 # Whether traffic data is shown
 # Available options: percent, bits, interface, none
-ShowBandwidthLabel = 'percent'
+ShowBandwidthLabel = 'interface'
 
 # Network backbone bandwidth (kilobits)
-Bandwidth = 128
+Bandwidth = 100
 
 #---------
 # RRDtool
@@ -132,4 +132,12 @@ WebServerPort = 8081
 
 # preset node positions in pixels
 # Example: {'192.168.0.1': (100,100)}
-NodePositions = {}
+NodePositions = {
+	'192.168.0.50': (100, 100),
+	'192.168.0.51': (100, 300)
+}
+
+# Temporary table of aliases when monitoring over external interface
+NodeAliases = {
+	'192.168.0.50': '192.168.1.50'
+}

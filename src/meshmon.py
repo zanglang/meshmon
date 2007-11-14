@@ -10,6 +10,13 @@ import config, nodes, threads, topology, webserver
 
 if (config.Debug):
 	logging.basicConfig(level=logging.DEBUG)
+	
+try:
+	#import psyco
+	#psyco.full()
+	logging.debug('Psyco optimization enabled!')
+except:
+	logging.debug('Psyco optimization not enabled.')
 
 if __name__ == "__main__":
 	""" Initialize monitoring """
