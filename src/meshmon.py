@@ -20,7 +20,7 @@ except:
 
 if __name__ == "__main__":
 	""" Initialize monitoring """
-	print 'TrafficMon started.\nPress <Ctrl>-C to shut down.'
+	print 'MeshMon started.\nPress <Ctrl>-C to shut down.'
 	
 	backend = None
 	try:

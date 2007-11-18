@@ -6,6 +6,7 @@ WIDTH $width
 
 # FONT from 1 to 5 (define size of font that will be used in graph)
 #FONT 2
+FONTDEFINE 100 weathermap/Vera.ttf 9
 
 # Position of legend
 KEYPOS $keypos
@@ -43,6 +44,9 @@ SCALE  40   55      0   240    0
 SCALE  55   70    240   240    0
 SCALE  70   85    255   192    0
 SCALE  85  100    255     0    0
+
+# Read up to 3000 seconds worth of RRDtool data
+SET rrd_period 3000
 
 # Define Nodes
 # NICTA Logo dimension: 168px x 60px

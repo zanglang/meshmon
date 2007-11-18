@@ -14,7 +14,7 @@ from string import Template
 #--------
 
 # Debug output (= True) or no debug output (= False)
-Debug = True
+Debug = False
 
 #------------
 # Monitoring
@@ -26,7 +26,7 @@ MainPlugin = 'RrdTool'
 
 # A tuple collection of the mobile nodes where traffic data should be collected from
 # Example: '192.168.0.1', '127.0.0.1'
-Nodes = ('192.168.0.50',)
+Nodes = ('10.0.0.57','10.0.0.50')
 #Nodes = []
 
 # A list of the interfaces to be monitored (separate by comma if more than one)
@@ -41,7 +41,7 @@ SnmpVersion = '2c'
 Community = 'public'
 
 # Interval for collecting traffic data in seconds
-TrafficInterval = 5
+TrafficInterval = 2
 
 #-----------------
 # Network Topology
@@ -69,14 +69,16 @@ TopologyConf = 'weathermap.conf'
 # Available options: percent, bits, interface, none
 ShowBandwidthLabel = 'interface'
 
-# Network backbone bandwidth (kilobits)
-Bandwidth = 100
+# Network backbone bandwidth (in bits per second)
+#	Leave it as 0 to let MeshMon automatically increase the scale
+Bandwidth = 0
 
 #---------
 # RRDtool
 #---------
 
 # Directory to locate RRDtool databases
+#	Example: '/var/www/rrd', '.'
 RrdPath = '.'
 
 # Defines filename location template for rrdtool databases
@@ -97,6 +99,7 @@ RefreshInterval = 5
 GraphInterval = 'hour'
 
 # Directory to output RRDtool graphs
+#	Example: '/var/www/images', '.'
 ImgPath = '.'
 
 # Output image format
@@ -133,11 +136,16 @@ WebServerPort = 8081
 # preset node positions in pixels
 # Example: {'192.168.0.1': (100,100)}
 NodePositions = {
-	'192.168.0.50': (100, 100),
-	'192.168.0.51': (100, 300)
+	'10.0.0.57': (200, 200),
+	'10.0.1.59': (500, 500),
+	'10.0.0.50': (200, 500),
+	'10.0.1.51': (500, 200)
 }
 
 # Temporary table of aliases when monitoring over external interface
 NodeAliases = {
-	'192.168.0.50': '192.168.1.50'
+	'10.0.1.59': '10.0.0.59',
+	'10.0.1.57': '10.0.0.57',
+	'10.0.1.51': '10.0.0.51',
+	'10.0.1.50': '10.0.0.50'
 }

@@ -217,7 +217,7 @@ class GathererThread(threads.MonitorThread):
 							#'-b now -60s',				# Start time now -1 min
 							'-s ' + `config.TrafficInterval`,	# interval
 							'DS:traffic_in:GAUGE:' + `config.TrafficInterval * 3` + ':U:U',
-							'DS:traffic_out:COUNTER:' + `config.TrafficInterval * 3` + ':U:U',
+							'DS:traffic_out:GAUGE:' + `config.TrafficInterval * 3` + ':U:U',
 							# wireless
 							'DS:link:GAUGE:120:U:U',
 							'DS:signal:GAUGE:120:U:U',
@@ -255,31 +255,6 @@ class GathererThread(threads.MonitorThread):
 
 		# interate through known interfaces
 		for interface in self.oids:
-			#oids = self.oids[interface]
-
-			#in_query = []
-			#out_query = []
-
-			# TODO: is this still required?
-			# get in/out octets for this interface
-			#try:
-			#	in_query, out_query = \
-			#		snmp.get(self.target.address, oids[0]), \
-			#		snmp.get(self.target.address, oids[1])
-
-			#	if self.interval > 10:
-			#		self.interval -= 1
-
-			#except Exception, e:
-			#	logging.error('Could not poll in/out octets for ' +
-			#		`self.target.address` + ': ' + `e`)
-
-			#	# try and reduce interval by 1
-			#	if self.interval < 30:
-			#		self.interval += 1
-
-			#in_octets = len(in_query) > 0 \
-			#		and in_query[0][1] or 0
 
 			in_octets = 0
 			out_octets = 0
@@ -288,11 +263,16 @@ class GathererThread(threads.MonitorThread):
 					self.target.aodv_data.has_key(interface):
 				in_octets = int(self.target.aodv_data[interface]['received'])
 				out_octets = int(self.target.aodv_data[interface]['sent'])
-					
-				print 'in', in_octets, 'out', out_octets
-	
-				###########################
-				# Testing AODV cache : find AODV entry using the same interface
+				
+				if in_octets * 8 > config.Bandwidth:
+					config.Bandwidth = in_octets * 8
+					print 'Increasing max bandwidth to ', config.Bandwidth, \
+							'bits/second'
+				
+				if out_octets * 8 > config.Bandwidth:
+					config.Bandwidth = out_octets * 8
+					print 'Increasing max bandwidth to ', config.Bandwidth, \
+							'bits/second'
 	
 				# push results into rrdtool
 				try:
@@ -316,9 +296,9 @@ class GathererThread(threads.MonitorThread):
 					rrdtool.update(self.target.rrd_files[interface],
 						'-t',
 						'link:signal:noise',
-						'N:%d:%d:%d' % (self.target.wifi_data[interface]['link'],
-								self.target.wifi_data[interface]['signal'],
-								self.target.wifi_data[interface]['noise'])
+						'N:%d:%d:%d' % (self.target.wifi_data[interface]['link'] * 100,
+								self.target.wifi_data[interface]['signal'] * 100,
+								self.target.wifi_data[interface]['noise'] * 100)
 					)
 					print ('Updating RRDtool link:%d signal:%d noise:%d' %
 							(self.target.wifi_data[interface]['link'],

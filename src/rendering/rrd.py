@@ -58,7 +58,7 @@ class GraphingThread(threads.MonitorThread):
 		# has more interfaces been detected?
 		if (self.node.interfaces > self.num_interfaces):
 			self.refresh_interfaces()
-
+			
 		for index, rrd_file in enumerate(self.rrd_files):
 			if not os.path.exists(rrd_file):
 				logging.error('RRD file %s does not exist?' % rrd_file)
@@ -66,7 +66,8 @@ class GraphingThread(threads.MonitorThread):
 
 			try:
 				rrdtool.graph(self.img_files[index],
-					'-s -1' + config.GraphInterval,	# hour
+					#'-s -1' + config.GraphInterval,	# hour
+					'-s -1h',	# hour
 					'-t', '%s %s hourly (1 minute average)' % (self.node.address,
 								self.node.interfaces[index]),
 					'-h', '70',
@@ -108,7 +109,8 @@ class GraphingThread(threads.MonitorThread):
 				)
 
 				rrdtool.graph(self.img_files[index].replace('.png','-wifi.png'),
-					'-s -1' + config.GraphInterval,	# hour
+					#'-s -1' + config.GraphInterval,	# hour
+					'-s -1h',
 					'-t', '%s %s hourly (1 minute average)' % (self.node.address,
 								self.node.interfaces[index]),
 					'-h', '70',

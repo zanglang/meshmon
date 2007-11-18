@@ -5,7 +5,7 @@ Version 0.1 - Jerry Chong <zanglang@gmail.com>
 Based on meshtraffic.pl by Dirk Lessner, National ICT Australia
 """
 
-import logging, topology
+import config, logging, topology
 
 # enumerated types of nodes, used for
 # 	differentiating the capabilities of nodes
@@ -48,7 +48,16 @@ def create(target):
 
 def find(target):
 	""" Find the node in collection with the given IP address """
+	
 	for n in collection:
 		if n.address == target:
 			return n
+			
+	# check if any aliases were defined also
+	if config.NodeAliases.has_key(target):
+		ntarget = config.NodeAliases[target]
+		for n in collection:
+			if n.address == ntarget:
+				return n
+		
 	return None

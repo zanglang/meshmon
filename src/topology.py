@@ -92,7 +92,7 @@ def add(node):
 
 	# if a layer already has 3 nodes we consider it "full".
 	# Expand to a new layer to be used later
-	#if (len(allocations[layer]) >= 3):
+	#if (len(allocations[layer]) >= 4):
 	#	layers.remove(layer)
 
 	for layer, allocation in allocations.items():

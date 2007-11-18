@@ -4,7 +4,7 @@ SNMP utility functions
 Version 0.1 - Jerry Chong <zanglang@gmail.com>
 """
 
-import config, thread
+import config, sys, thread
 try:
 	from pysnmp.entity.rfc3413.oneliner import cmdgen, ntforg
 	from pysnmp.smi import builder
@@ -13,6 +13,11 @@ except:
 	print 'Python library PySNMP 4.x is required!'
 	sys.exit()
 
+# timer function
+if sys.platform == 'win32':
+  from time import clock
+else:
+  from time import time as clock
 
 # load the commonly used MIB definitions and other SNMP stuff
 mib = builder.MibBuilder().loadModules('SNMPv2-MIB', 'IF-MIB', 'RFC1213-MIB')
@@ -37,13 +42,18 @@ def load_symbol(module, object):
 def walk(target, objects):
 	""" SNMP WALK query """
 	
+	# acquire thread lock for critical region
 	lock.acquire()
+	start = clock()
 	errorIndication, errorStatus, errorIndex, varBinds = cmd.nextCmd(
 		community,
 		cmdgen.UdpTransportTarget((get_address(target), 161)),
 		objects
 	)
 	lock.release()
+	
+	# total execution time for SNMP call (e.g. network latency)
+	T = clock() - start
 	
 	if (errorIndication != None):
 		raise Exception, 'SNMP error on %s: %s' % (target, errorIndication)
@@ -55,13 +65,18 @@ def walk(target, objects):
 def get(target, objects):
 	""" SNMP GET query """
 	
+	# acquire thread lock for critical region
 	lock.acquire()
+	start = clock()
 	errorIndication, errorStatus, errorIndex, varBinds = cmd.getCmd(
 		community,
 		cmdgen.UdpTransportTarget((get_address(target), 161)),
 		objects
 	)
 	lock.release()
+	
+	# total execution time for SNMP call (e.g. network latency)
+	T = clock() - start
 	
 	if (errorIndication != None):
 		raise Exception, 'SNMP error on %s: %s' % (target, errorIndication)

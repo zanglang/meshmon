@@ -91,15 +91,18 @@ class WeathermapThread(threads.MonitorThread):
 							'host': node.address,
 							'if': interface
 						})
+						# replace working directory paths
+						rrd_file = rrd_file.replace('./', '')
 
 						# Is this a parallel link? 0 = first link, >=1 = parallel
 						if links[neighbour] == 1:
 							conf_template += (('LINK MN%s-%s-%s\n\t' +
 									'NODES MN%s MN%s\n\t' +
-									'TARGET %s\n') %
+									#'TARGET rrd:%s:traffic_in:traffic_out\n') %
+									'TARGET rrd:10.0.0.57-ath3.rrd:traffic_in:traffic_out\n') %
 										(node.address, interface, neighbour.address,
-										node.address, neighbour.address,
-										rrd_file))
+										node.address, neighbour.address))
+										#rrd_file))
 
 						else:
 							# this is a parallel link. Calculate node offsets
@@ -127,13 +130,14 @@ class WeathermapThread(threads.MonitorThread):
 							conf_template += ('\tBWLABEL none\n')
 							conf_template += ('\tOUTCOMMENT %s\n' % interface)
 							conf_template += ('\tCOMMENTPOS 70 30\n')
-							conf_template += ('\tCOMMENTFONT 2\n')
+							conf_template += ('\tCOMMENTFONT 100\n')
 						else:
 							conf_template += ('\tBWLABEL %s\n' %
 									config.ShowBandwidthLabel)
 							conf_template += ('\tBWLABELPOS 70 30\n')
 
-						conf_template += ('\tBANDWIDTH %d\n' % config.Bandwidth)
+						if config.Bandwidth > 0:
+							conf_template += ('\tBANDWIDTH %d\n' % config.Bandwidth)
 						conf_template += ('\tOVERLIBGRAPH images/%s\n' %
 								rrd_file.replace('.rrd', '.' +
 								config.ImgFormat.lower()))
@@ -184,11 +188,18 @@ def get_intermediate(node1, node2, offset):
 	x = abs(node1[0] - node2[0])/2 + min(node1[0], node2[0])
 	y = abs(node1[1] - node2[1])/2 + min(node1[1], node2[1])
 
-	logging.debug('Intermediate: ' + str(x) + ' ' + str(y))
-	result = offset % 2 == 1 \
-			and (x - 20 * offset, y - 20 * offset) \
-			or (x + 20 * offset , y + 20 * offset)
-	logging.debug('Result: ' + str(result))
+	#logging.debug('Intermediate: ' + str(x) + ' ' + str(y))
+	direction = (node1[0] - node2[0])/(node1[1] - node2[1])
+	#logging.debug(direction)	
+	result = direction <= 0 \
+			and (offset % 2 == 1 \
+					and (x - 20 * int(offset / 2), y - 20 * int(offset / 2)) \
+					or (x + 20 * int(offset / 2), y + 20 * int(offset / 2))) \
+			or (offset % 2 == 1 \
+					and (x + 20 * int(offset / 2), y - 20 * int(offset / 2)) \
+					or (x - 20 * int(offset / 2), y + 20 * int(offset / 2)))
+	#logging.debug('Result: ' + str(result))
+	
 	return result
 
 
