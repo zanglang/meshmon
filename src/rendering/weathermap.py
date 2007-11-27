@@ -98,11 +98,11 @@ class WeathermapThread(threads.MonitorThread):
 						if links[neighbour] == 1:
 							conf_template += (('LINK MN%s-%s-%s\n\t' +
 									'NODES MN%s MN%s\n\t' +
-									#'TARGET rrd:%s:traffic_in:traffic_out\n') %
-									'TARGET rrd:10.0.0.57-ath3.rrd:traffic_in:traffic_out\n') %
+									'TARGET rrd:%s:traffic_in:traffic_out\n') %
+									#'TARGET rrd:10.0.0.57-ath3.rrd:traffic_in:traffic_out\n') %
 										(node.address, interface, neighbour.address,
-										node.address, neighbour.address))
-										#rrd_file))
+										node.address, neighbour.address,
+										rrd_file))
 
 						else:
 							# this is a parallel link. Calculate node offsets
@@ -125,12 +125,16 @@ class WeathermapThread(threads.MonitorThread):
 										))
 										# we'll used straight lines for now
 										#'\tVIA ' + position1 + '\n')
+										
+						if node not in neighbour.neighbours:
+							conf_template += ('\tLINKSTYLE oneway\n')
 
 						if config.ShowBandwidthLabel == 'interface':
 							conf_template += ('\tBWLABEL none\n')
 							conf_template += ('\tOUTCOMMENT %s\n' % interface)
 							conf_template += ('\tCOMMENTPOS 70 30\n')
 							conf_template += ('\tCOMMENTFONT 100\n')
+							conf_template += ('\tCOMMENTFONTCOLOR 0 0 0\n')
 						else:
 							conf_template += ('\tBWLABEL %s\n' %
 									config.ShowBandwidthLabel)

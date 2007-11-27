@@ -11,6 +11,7 @@ render = web.template.render('html/', cache=False)
 urls = (
 	'/', 'index',
 	'/update', 'update',
+	'/files', 'files',
 	'/web/(.*)', 'webstuff',
 	'/(.*\.css)', 'webstuff',
 	'/(.*\.js)', 'webstuff',
@@ -18,9 +19,28 @@ urls = (
 )
 
 # definitions for views
-TRAFFIC, WIRELESS = range(2)
+TRAFFIC, WIRELESS, DEBUG_AODV = range(3)
 config.WebView = TRAFFIC	# Default = traffic
 
+
+def generate_files():
+	# Generates a Javascript string array of RRDtool images to load
+	try:
+		files = reduce(lambda files, f: files + f,
+			[n.rrd_files.values() for n in nodes.collection
+					if n.type is nodes.ROUTER], [])
+	except Exception, e:
+		# rrd files may not be populated yet
+		logging.error(e)
+		files = []
+
+	for index, f in enumerate(files):
+		if config.WebView is TRAFFIC:
+			files[index] = f.replace('.rrd', '')
+		else:
+			files[index] = f.replace('.rrd', '-wifi')
+	files.sort()
+	return files
 
 
 class index:
@@ -30,22 +50,8 @@ class index:
 		""" Index page generator. The web interface will parse this script
 			to determine which images to show on runtime """
 
-		# get list of RRD images
-		try:
-			files = reduce(lambda files, f: files + f,
-				[n.rrd_files.values() for n in nodes.collection
-						if n.type is nodes.ROUTER], [])
-		except Exception, e:
-			# rrd files may not be populated yet
-			logging.error(e)
-			files = []
-
-		for index, f in enumerate(files):
-			if config.WebView is TRAFFIC:
-				files[index] = f.replace('.rrd', '')
-			else:
-				files[index] = f.replace('.rrd', '-wifi')
-		files.sort()
+		# fetch list of images
+		files = generate_files()
 
 		# javascript update interval
 		if config.TrafficInterval < 3:
@@ -57,9 +63,19 @@ class index:
 		f = open('html/weathermap.html')
 		imagemap = f.read()
 		f.close()
+		
+		logging.debug(config.WebView)
+		logging.debug(config.ShowBandwidthLabel)
 
-		print render.index(files, interval, imagemap)
+		print render.index(config.WebView, files, interval,
+					config.ShowBandwidthLabel, imagemap)
 
+
+class files:
+	""" List of RRDtool files """
+	def GET(self):
+		print generate_files()
+		
 
 class images:
 	""" Images loader """
@@ -99,8 +115,8 @@ class update:
 			if config.WebView < 0 or config.WebView > WIRELESS:
 				config.WebView = TRAFFIC
 
-		if i.has_key('weathermap'):
-			config.ShowBandwidthLabel = i.weathermap
+		if i.has_key('statistics'):
+			config.ShowBandwidthLabel = i.statistics
 
 		if config.Debug:
 			web.debug(i)
@@ -130,12 +146,7 @@ class WebThread(threads.GenericThread):
 			else:
 				sys.argv.append(str(config.WebServerPort))
 
-		# Not using meshmon's own threads implementation because web.py's API
-		# does not provide methods to kill the webserver. We'll just terminate
-		# upon sys.exit() then.
-		#thread.start_new_thread(web.run, (urls, globals()))
-		web.run(urls, globals(), web.reloader)
-		#web.httpserver.runsimple(web.webapi.wsgifunc(web.webpyfunc(urls, globals(), True), web.reloader), ('0.0.0.0', config.WebServerPort))
+		web.httpserver.runsimple(web.webapi.wsgifunc(web.webpyfunc(urls, globals(), True), web.reloader), ('0.0.0.0', config.WebServerPort))
 
 		# HACK: put argv back
 		if argv:

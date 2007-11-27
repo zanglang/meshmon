@@ -5,16 +5,14 @@ Version 0.1 - Jerry Chong <zanglang@gmail.com>
 Based on meshtraffic.pl by Dirk Lessner, National ICT Australia
 """
 
-import logging, os, random, rrdtool
+import logging, os, rrdtool
 import aodv, config, nodes, snmp, threads, wifi
 import rendering.rrd
 
 # Look up OIDs for in/out octets
+logging.debug('Loading SNMP symbols')
 InOctets = snmp.load_symbol('IF-MIB', 'ifInOctets')
 OutOctets = snmp.load_symbol('IF-MIB', 'ifOutOctets')
-
-# Used for simulation thread
-random.seed()
 
 # cache for UCD-SNMP-MIB::ext*
 execResults = {}

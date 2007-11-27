@@ -10,13 +10,6 @@ import config, nodes, threads, topology, webserver
 
 if (config.Debug):
 	logging.basicConfig(level=logging.DEBUG)
-	
-try:
-	#import psyco
-	#psyco.full()
-	logging.debug('Psyco optimization enabled!')
-except:
-	logging.debug('Psyco optimization not enabled.')
 
 if __name__ == "__main__":
 	""" Initialize monitoring """
@@ -29,8 +22,10 @@ if __name__ == "__main__":
 			MODULE = sys.argv[1]
 		else:
 			MODULE = config.MainPlugin
-			
+		logging.debug('Loading plugin namespace \'plugins.' + MODULE + '\'...')	
+		
 		backend = __import__('plugins.' + MODULE)
+		logging.debug('Import complete')
 		plugin = backend.__dict__[MODULE]
 		if not plugin.__dict__.has_key('initialize') or \
 				not plugin.__dict__.has_key('PLUGIN_INFO'):
@@ -45,6 +40,7 @@ if __name__ == "__main__":
 	try:
 	
 		# set up topology
+		logging.debug('Initializing topology')
 		topology.initialize()
 		
 		# initialize interface indices for monitored nodes
@@ -58,9 +54,11 @@ if __name__ == "__main__":
 			nodes.add(n)
 		
 		# do any processing defined by plugin
+		logging.debug('Initializing plugin')
 		plugin.initialize()
 		
 		# start web server
+		logging.debug('Starting web server')
 		threads.add(webserver.WebThread())
 		
 		# print thread pool status

@@ -1,0 +1,3 @@
+#!/bin/bash
+PYTHONPATH=/home/zanglang/Projects/meshmon/src
+python src/meshmon.py

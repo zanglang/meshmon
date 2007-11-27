@@ -1,4 +1,4 @@
-$def with (files, interval, imagemap)
+$def with (view, files, interval, mapoptions, imagemap)
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -16,7 +16,7 @@ $def with (files, interval, imagemap)
 	var images = []
 	var interval = $interval
 	var timer = null;
-	
+
 	function init() {
 		imagesDiv = \$('sidebar');
 			files.each(function(file) {
@@ -37,10 +37,27 @@ $def with (files, interval, imagemap)
 			imagesDiv.appendChild(ele)
 			images.push(ele);
 		});
+
+		selectDropDown('interval', $interval);
+		selectDropDown('view', $view);
+		selectDropDown('statistics', '$mapoptions');
+
+		\$('sidebar-title').innerHTML = \$('view')[$view].innerHTML + ' Images';
+
 		\$('weathermap').src = 'images/weathermap.png';
 		timer = setTimeout('refresh()', interval);
 	}
-	
+
+	function selectDropDown(id, value) {
+		for (var index = 0; index < \$(id).length; ++index) {
+			var ele = \$(id)[index];
+			if (ele.value == value) {
+				\$(id).selectedIndex = index;
+				break
+			}
+		}
+	}
+
 	function refresh() {
 		var rand = Math.round(Math.random()*10000000000);
 		images.each(function(img, index) {
@@ -52,26 +69,16 @@ $def with (files, interval, imagemap)
 		\$('weathermap').src = 'images/weathermap.png?rand=' + rand;
 		timer = setTimeout('refresh()', interval);
 	}
-	
+
 	function updateOptions(ele) {
 		param = (ele[ele.selectedIndex]).value;
 		if (timer != null)
 			clearTimeout(timer);
-		
+
 		\$('mainform').action = 'update?' + ele.id + '=' + param
 		\$('mainform').submit()
 	}
-	
-	function changeView() {
-		var ele = \$('statistics');
-		view = (ele[ele.selectedIndex]).value
-		if (timer != null)
-			clearTimeout(timer);
-		
-		\$('mainform').action = 'update?view=' + view
-		\$('mainform').submit()
-	}
-	
+
 	function expand(id) {
 		ele = \$(id)
 		arrow = ele.childNodes[0]
@@ -107,7 +114,6 @@ $:imagemap
 	<td width='200px'>
 	Monitoring interval:<br/>
 	<select id="interval" onchange="updateOptions(this)">
-		<option>---</option>
 		<option value="1000">1</option>
 		<option value="3000">3</option>
 		<option value="5000">5</option>
@@ -117,26 +123,20 @@ $:imagemap
 		<option value="60000">60</option>
 	</select>
 	</td>
+	<td width='300px'>
+	Toggle link statistics:<br/>
+	<select id="statistics" onchange="updateOptions(this)">
+		<option value="percent">Show Bandwidth Usage</option>
+		<option value="bits">Show Data Rate</option>
+		<option value="interface">Show Interfaces</option>
+		<option value="none">Do not show</option>
+	</select>
+	</td>
 	<td>
 	Toggle RRDtool view:<br/>
 	<select id="view" onchange="updateOptions(this)">
-		<option>---</option>
 		<option value="0">Traffic</option>
 		<option value="1">Wireless Signal</option>
-	</select>
-	</td>
-</tr>
-<tr>
-	<td>
-	</td>
-	<td>
-	Toggle link statistics:<br/>
-	<select id="weathermap" onchange="updateOptions(this)">
-		<option>---</option>
-		<option value="percent">Show Bandwidth Usage</option>
-		<option value="bits">Show Data Rate</option>
-		<option value="interface">Show Interfaces</option>		
-		<option value="none">Do not show</option>
 	</select>
 	</td>
 </tr>
@@ -144,7 +144,7 @@ $:imagemap
 </div>
 <div id="sidebar">
 	<br/>
-	<h3 align='center'><b>Traffic Images<b></h3>
+	<h3 align='center'><b><div id="sidebar-title">Traffic Images</div><b></h3>
 	<br/>
 	<div id='images'>
 	</div>

@@ -14,7 +14,7 @@ from string import Template
 #--------
 
 # Debug output (= True) or no debug output (= False)
-Debug = False
+Debug = True
 
 #------------
 # Monitoring
@@ -26,7 +26,7 @@ MainPlugin = 'RrdTool'
 
 # A tuple collection of the mobile nodes where traffic data should be collected from
 # Example: '192.168.0.1', '127.0.0.1'
-Nodes = ('10.0.0.57','10.0.0.50')
+Nodes = ('10.0.0.57','10.0.0.50','10.0.0.51','10.0.0.59')
 #Nodes = []
 
 # A list of the interfaces to be monitored (separate by comma if more than one)
@@ -137,9 +137,9 @@ WebServerPort = 8081
 # Example: {'192.168.0.1': (100,100)}
 NodePositions = {
 	'10.0.0.57': (200, 200),
-	'10.0.1.59': (500, 500),
+	'10.0.0.59': (500, 500),
 	'10.0.0.50': (200, 500),
-	'10.0.1.51': (500, 200)
+	'10.0.0.51': (500, 200)
 }
 
 # Temporary table of aliases when monitoring over external interface
