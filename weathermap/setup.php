@@ -12,7 +12,7 @@
 
 function weathermap_version () {
 	return array( 	'name'    	=> 'weathermap',
-		'version'       => '0.93',
+		'version'       => '0.94',
 		'longname'      => 'PHP Network Weathermap',
 		'author'        => 'Howard Jones',
 		'homepage'      => 'http://www.network-weathermap.com/',
@@ -30,6 +30,7 @@ function plugin_init_weathermap() {
 	$plugin_hooks['draw_navigation_text']['weathermap'] = 'weathermap_draw_navigation_text';
 	$plugin_hooks['config_settings']['weathermap'] = 'weathermap_config_settings';
 	$plugin_hooks['poller_bottom']['weathermap'] = 'weathermap_poller_bottom';
+	$plugin_hooks['poller_output']['weathermap'] = 'weathermap_poller_output';
 
 	$plugin_hooks['top_graph_refresh']['weathermap'] = 'weathermap_top_graph_refresh';
 }
@@ -174,6 +175,14 @@ function weathermap_setup_table () {
 			mapid int(11) NOT NULL default '0'
 		) TYPE=MyISAM;";
 	}
+	
+	if (!in_array('weathermap_data', $tables)) {
+		$sql[] = "CREATE TABLE IF NOT EXISTS weathermap_data (id int(11) NOT NULL auto_increment,
+			rrdfile varchar(255) NOT NULL,data_source_name varchar(19) NOT NULL,
+			  last_time int(11) NOT NULL,last_value varchar(255) NOT NULL,
+			last_calc varchar(255) NOT NULL, sequence int(11) NOT NULL, PRIMARY KEY  (id), KEY rrdfile (rrdfile),
+			  KEY data_source_name (data_source_name) ) TYPE=MyISAM";
+	}
 
 	// create the settings entries, if necessary
 
@@ -250,7 +259,13 @@ function weathermap_show_tab () {
 
 	if ((db_fetch_assoc("select user_auth_realm.realm_id from user_auth_realm where user_auth_realm.user_id='" . $_SESSION["sess_user_id"] . "' and user_auth_realm.realm_id='$realm_id2'")) || (empty($realm_id2))) {
 
-		print '<a href="' . $config['url_path'] . 'plugins/weathermap/weathermap-cacti-plugin.php"><img src="' . $config['url_path'] . 'plugins/weathermap/images/tab_wmap.gif" alt="Weathermap" align="absmiddle" border="0"></a>';
+		print '<a href="' . $config['url_path'] . 'plugins/weathermap/weathermap-cacti-plugin.php"><img src="' . $config['url_path'] . 'plugins/weathermap/images/tab_weathermap';
+		// if we're ON a weathermap page, print '_red'
+		if(preg_match('/plugins\/weathermap\/weathermap-cacti-plugin.php/',$_SERVER['REQUEST_URI'] ,$matches))
+		{
+			print "_red";
+		}
+		print '.png" alt="Weathermap" align="absmiddle" border="0"></a>';
 
 	}
 
@@ -289,6 +304,73 @@ function weathermap_draw_navigation_text ($nav) {
 	return $nav;
 }
 
+function weathermap_poller_output ($rrd_update_array) {
+	global $config;
+	// global $weathermap_debugging;
+
+	// partially borrowed from Jimmy Conner's THold plugin.
+	// (although I do things slightly differently - I go from filenames, and don't use the poller_interval)
+
+	cacti_log("*****************************************************************\npoller_output starting\n",true,"WEATHERMAP");
+	
+	$requiredlist = db_fetch_assoc("select distinct weathermap_data.*, data_template_data.local_data_id, data_template_rrd.data_source_type_id from weathermap_data, data_template_data, data_template_rrd where weathermap_data.rrdfile=data_template_data.data_source_path and data_template_rrd.local_data_id=data_template_data.local_data_id");
+	
+	foreach ($requiredlist as $required)
+	{
+		$file = str_replace("<path_rra>", $config['base_path'].'/rra', $required['rrdfile']);
+		$dsname = $required['data_source_name'];
+		
+		if( isset( $rrd_update_array{$file}['times'][key($rrd_update_array[$file]['times'])]{$dsname} ) )
+		{
+			$value = $rrd_update_array{$file}['times'][key($rrd_update_array[$file]['times'])]{$dsname};
+			$time = key($rrd_update_array[$file]['times']);
+			cacti_log("Got one! $file:$dsname -> $time $value\n",true,"WEATHERMAP");
+			
+			$period = $time - $required['last_time'];
+			$lastval = $required['last_value'];
+			
+			switch($required['data_source_type_id'])
+			{
+				case 1: //GAUGE
+					$newvalue = $value;
+					break;
+				
+				case 2: //COUNTER
+					if ($value >= $lastval) {
+						// Everything is normal
+						$newvalue = $value - $lastval;
+					} else {
+						// Possible overflow, see if its 32bit or 64bit
+						if ($lastval > 4294967295) {
+							$newvalue = (18446744073709551615 - $lastval) + $value;
+						} else {
+							$newvalue = (4294967295 - $lastval) + $value;
+						}
+					}
+					$newvalue = $newvalue / $period;
+					break;
+				
+				case 3: //DERIVE
+					$newvalue = ($value-$lastval) / $period;
+					break;
+				
+				case 4: //ABSOLUTE
+					$newvalue = $value / $period;
+					break;
+				
+				default: // do something somewhat sensible in case something odd happens
+					$newvalue = $value;
+					break;
+			}
+			db_execute("UPDATE weathermap_data SET last_time=$time, last_calc='$newvalue', last_value='$value',sequence=sequence+1  where id = " . $required['id']);
+			cacti_log("Final value is $newvalue (was $lastval, period was $period)\n",true,"WEATHERMAP");
+		}
+	}
+
+	cacti_log("poller_output done\n*****************************************************************\n",true,"WEATHERMAP");
+	
+	return $rrd_update_array;
+}
 
 function weathermap_poller_bottom () {
 	global $config;

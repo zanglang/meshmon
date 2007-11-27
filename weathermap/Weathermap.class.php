@@ -1,12 +1,12 @@
 <?php
-// PHP Weathermap 0.93
+// PHP Weathermap 0.94
 // Copyright Howard Jones, 2005-2007 howie@thingy.com
 // http://www.network-weathermap.com/
 // Released under the GNU Public License
 
 require_once "HTML_ImageMap.class.php";
 
-$WEATHERMAP_VERSION="0.93";
+$WEATHERMAP_VERSION="0.94";
 $weathermap_debugging=FALSE;
 
 // Turn on ALL error reporting for now.
@@ -16,6 +16,15 @@ error_reporting (E_ALL);
 define("IN",0);
 define("OUT",1);
 define("WMCHANNELS",2);
+
+// some strings that are used in more than one place
+define('FMT_BITS_IN',"{link:this:bandwidth_in:%2k}");
+define('FMT_BITS_OUT',"{link:this:bandwidth_out:%2k}");
+define('FMT_UNFORM_IN',"{link:this:bandwidth_in}");
+define('FMT_UNFORM_OUT',"{link:this:bandwidth_out}");
+define('FMT_PERC_IN',"{link:this:inpercent:%.2f}%");
+define('FMT_PERC_OUT',"{link:this:outpercent:%.2f}%");
+
 
 // Utility functions
 // Check for GD & PNG support This is just in here so that both the editor and CLI can use it without the need for another file
@@ -198,6 +207,37 @@ function imagecreatefromfile($filename)
 		warn("Image file $filename is unreadable. Check permissions. [WMIMG05]\n");    
 	}
 	return $bgimage;
+}
+
+
+// find the point where a line from x1,y1 through x2,y2 crosses another line through x3,y3 and x4,y4
+// (the point might not be between those points, but beyond them)
+// - doesn't handle parallel lines. In our case we will never get them.
+// XXX - make sure we remove colinear points, or this will not be true!
+function line_crossing($x1,$y1,$x2,$y2, $x3,$y3,$x4,$y4)
+{
+    
+    // First, check that the slope isn't infinite.
+    // if it is, tweak it to be merely huge
+    if($x1 != $x2) { $slope1 = ($y2-$y1)/($x2-$x1); }
+    else { $slope1 = 1e10; print "Slope1 is infinite.\n";}
+    
+    if($x3 != $x4) { $slope2 = ($y4-$y3)/($x4-$x3); }
+    else { $slope2 = 1e10; print "Slope2 is infinite.\n";}
+    
+    $a1 = $slope1;
+    $a2 = $slope2;
+    $b1 = -1;
+    $b2 = -1;   
+    $c1 = ($y1 - $slope1 * $x1 );
+    $c2 = ($y3 - $slope2 * $x3 );
+    
+    $det_inv = 1/($a1*$b2 - $a2*$b1);
+    
+    $xi = (($b1*$c2 - $b2*$c1)*$det_inv);
+    $yi = (($a2*$c1 - $a1*$c2)*$det_inv);
+    
+    return(array($xi,$yi));
 }
 
 // rotate a list of points around cx,cy by an angle in radians, IN PLACE
@@ -431,6 +471,59 @@ function calc_curve(&$in_xarray, &$in_yarray,$pointsperspan = 12)
 	return ($curvepoints);
 }
 
+// Give a list of key points, calculate a "curve" through them
+// return value is an array of triples (x,y,distance)
+// this is here to mirror the real 'curve' version when we're using angled VIAs
+// it means that all the stuff that expects an array of points with distances won't be upset.
+function calc_straight(&$in_xarray, &$in_yarray,$pointsperspan = 12)
+{
+
+	// search through the point list, for consecutive duplicate points
+	// (most common case will be a straight link with both NODEs at the same place, I think)
+	// strip those out, because they'll break the binary search/centre-point stuff
+
+	$last_x=NULL;
+	$last_y=NULL;
+
+	for ($i=0; $i < count($in_xarray); $i++)
+	{
+		if (($in_xarray[$i] == $last_x) && ($in_yarray[$i] == $last_y)) { debug
+			("Dumping useless duplicate point on curve\n"); }
+		else
+		{
+			$xarray[]=$in_xarray[$i];
+			$yarray[]=$in_yarray[$i];
+		}
+
+		$last_x=$in_xarray[$i];
+		$last_y=$in_yarray[$i];
+	}
+
+	// only proceed if we still have at least two points!
+	if(count($xarray) <= 1)
+	{
+		warn ("Arrow not drawn, as it's 1-dimensional.\n");
+		return (array(NULL, NULL, NULL, NULL));
+	}
+
+	$npoints=count($xarray);
+
+	$curvepoints=array();
+
+	$np=0;
+	$distance=0;
+	
+	for ($i=0; $i < ($npoints -1); $i++)
+	{
+		$curvepoints[] = array($xarray[$i],$yarray[$i],$distance);
+		// work out the next distance...		
+		$distance += sqrt( pow($xarray[$i+1] - $xarray[$i],2) + pow($yarray[$i+1] - $yarray[$i],2) );
+	}
+	$curvepoints[] = array($xarray[$npoints-1],$yarray[$npoints-1],$distance);
+	
+	return ($curvepoints);
+}
+
 function calc_arrowsize($width,&$map,$linkname)
 {
 	$arrowlengthfactor=4;
@@ -454,6 +547,8 @@ function calc_arrowsize($width,&$map,$linkname)
 	return( array($arrowsize,$arrowwidth) );
 }
 
+
+
 // top-level function that takes a two lists to define some points, and draws a weathermap link
 // - this takes care of all the extras, like arrowheads, and where to put the bandwidth labels
 //    curvepoints is an array of the points the curve passes through
@@ -461,12 +556,11 @@ function calc_arrowsize($width,&$map,$linkname)
 //    outlinecolour is a GD colour reference
 //    fillcolours is an array of two more colour references, one for the out, and one for the in spans
 function draw_curve($image, &$curvepoints, $width, $outlinecolour, $comment_colour, $fillcolours, $linkname, &$map,
-	$q2_percent=50)
+	$q2_percent=50, $unidirectional=FALSE)
 {
 	// now we have a 'spine' - all the central points for this curve.
 	// time to flesh it out to the right width, and figure out where to draw arrows and bandwidth boxes...
-	$unidirectional = FALSE;
-	
+		
 	// get the full length of the curve from the last point
 	$totaldistance = $curvepoints[count($curvepoints)-1][2];
 	// find where the in and out arrows will join (normally halfway point)
@@ -1766,6 +1860,9 @@ class WeatherMapNode extends WeatherMapItem
 		$js.="Nodes[" . js_escape($this->name) . "] = {";
 		$js.="x:" . $this->x . ", ";
 		$js.="y:" . $this->y . ", ";
+		$js.="ox:" . $this->original_x . ", ";
+		$js.="oy:" . $this->original_y . ", ";
+		$js.="relative_to:" . js_escape($this->relative_to) . ", ";
 		$js.="label:" . js_escape($this->label) . ", ";
 		$js.="name:" . js_escape($this->name) . ", ";
 		$js.="infourl:" . js_escape($this->infourl) . ", ";
@@ -1782,23 +1879,26 @@ class WeatherMapNode extends WeatherMapItem
 	{
 		$js = '';
 		$js .= "" . js_escape($this->name) . ": {";
-		$js .= "x:" . ($this->x - $this->centre_x). ", ";
-		$js .= "y:" . ($this->y - $this->centre_y) . ", ";
-		$js .= "cx:" . $this->centre_x. ", ";
-		$js .= "cy:" . $this->centre_y . ", ";
-		$js .= "name:" . js_escape($this->name) . ", ";
+		$js .= "\"x\":" . ($this->x - $this->centre_x). ", ";
+		$js .= "\"y\":" . ($this->y - $this->centre_y) . ", ";
+		$js .= "\"cx\":" . $this->centre_x. ", ";
+		$js .= "\"cy\":" . $this->centre_y . ", ";
+		$js .= "\"ox\":" . $this->original_x . ", ";
+		$js .= "\"oy\":" . $this->original_y . ", ";
+		$js .= "\"relative_to\":" . js_escape($this->relative_to) . ", ";
+		$js .= "\"name\":" . js_escape($this->name) . ", ";
 		if($complete)
 		{
-			$js .= "label:" . js_escape($this->label) . ", ";
-			$js .= "infourl:" . js_escape($this->infourl) . ", ";
-			$js .= "overliburl:" . js_escape($this->overliburl) . ", ";
-			$js .= "overlibcaption:" . js_escape($this->overlibcaption) . ", ";
+			$js .= "\"label\":" . js_escape($this->label) . ", ";
+			$js .= "\"infourl\":" . js_escape($this->infourl) . ", ";
+			$js .= "\"overliburl\":" . js_escape($this->overliburl) . ", ";
+			$js .= "\"overlibcaption\":" . js_escape($this->overlibcaption) . ", ";
 	
-			$js .= "overlibwidth:" . $this->overlibheight . ", ";
-			$js .= "overlibheight:" . $this->overlibwidth . ", ";
-			$js .= "iconfile:" . js_escape($this->iconfile). ", ";
+			$js .= "\"overlibwidth\":" . $this->overlibheight . ", ";
+			$js .= "\"overlibheight\":" . $this->overlibwidth . ", ";
+			$js .= "\"iconfile\":" . js_escape($this->iconfile). ", ";
 		}
-		$js .= "iconcachefile:" . js_escape($this->cachefile);
+		$js .= "\"iconcachefile\":" . js_escape($this->cachefile);
 		$js .= "},\n";
 		return $js;
 	}
@@ -1949,7 +2049,7 @@ class WeatherMapLink extends WeatherMapItem
 	var $owner,                $name;
 	var $maphtml;
 	var $a,                    $b; // the ends - references to nodes
-	var $width,                $arrowstyle;
+	var $width,                $arrowstyle, $linkstyle;
 	var $bwfont,               $labelstyle, $labelboxstyle;
 	var $overliburl,           $infourl;
 	var $notes;
@@ -1965,6 +2065,7 @@ class WeatherMapLink extends WeatherMapItem
 	var $inpercent,            $outpercent;
 	var $inherit_fieldlist;
 	var $vialist = array();
+	var $viastyle;
 	var $usescale; 
 	var $outlinecolour;
 	var $bwoutlinecolour;
@@ -1976,6 +2077,7 @@ class WeatherMapLink extends WeatherMapItem
 	var $bwfontcolour;
 	# var $incomment, $outcomment;
 	var $comments = array();
+	var $bwlabelformats = array();
 	var $curvepoints;
 	var $labeloffset_in, $labeloffset_out;
 	var $commentoffset_in, $commentoffset_out;
@@ -1991,6 +2093,7 @@ class WeatherMapLink extends WeatherMapItem
 			'commentoffset_out' => 5,
 			'commentoffset_in' => 95,
 			'arrowstyle' => 'classic',
+			'viastyle' => 'curved',
 			'usescale' => 'DEFAULT',
 			'targets' => array(),
 			'infourl' => '',
@@ -1998,9 +2101,11 @@ class WeatherMapLink extends WeatherMapItem
 			'notes' => array(),
 			'hints' => array(),
 			'comments' => array('',''),
+			'bwlabelformats' => array(FMT_PERC_IN,FMT_PERC_OUT),
 			'overliburl' => '',
 			'labelstyle' => 'percent',
 			'labelboxstyle' => 'classic',
+			'linkstyle' => 'twoway',
 			'overlibwidth' => 0,
 			'overlibheight' => 0,
 			'outlinecolour' => array(0, 0, 0),
@@ -2234,13 +2339,32 @@ class WeatherMapLink extends WeatherMapItem
 			$link_out_width = (($link_out_width * $this->outpercent * 1.5 + 0.1) / 100) + 1;
 		}
 
-		
-		// Calculate the spine points - the actual curve	
-		$this->curvepoints = calc_curve($xpoints, $ypoints);
+
+		if($this->viastyle=='curved')
+		{
+			// Calculate the spine points - the actual curve	
+			$this->curvepoints = calc_curve($xpoints, $ypoints);
 				
-		draw_curve($im, $this->curvepoints,
-			$link_width, $outline_colour, $comment_colour, array($link_in_colour, $link_out_colour),
-			$this->name, $map);
+			// then draw the curve itself
+			draw_curve($im, $this->curvepoints,
+				$link_width, $outline_colour, $comment_colour, array($link_in_colour, $link_out_colour),
+				$this->name, $map, 50, ($this->linkstyle=='oneway'?TRUE:FALSE) );
+		}
+		
+		if($this->viastyle=='angled')
+		{
+			// Calculate the spine points - the actual not a curve really, but we
+			// need to create the array, and calculate the distance bits, otherwise
+			// things like bwlabels won't know where to go.
+			
+			$this->curvepoints = calc_straight($xpoints, $ypoints);
+				
+			// then draw the "curve" itself
+			// XXX - this is not correct either - should draw the straight version
+			draw_curve($im, $this->curvepoints,
+				$link_width, $outline_colour, $comment_colour, array($link_in_colour, $link_out_colour),
+				$this->name, $map, 50, ($this->linkstyle=='oneway'?TRUE:FALSE) );
+		}
 
 		$this->DrawComments($im,$comment_colour,$link_width*1.1);
 
@@ -2285,17 +2409,30 @@ class WeatherMapLink extends WeatherMapItem
 				$outbound[5]=$this->max_bandwidth_out;
 				$inbound[5]=$this->max_bandwidth_in;
 			}
+			
+			
+			if($this->linkstyle=='oneway')
+			{
+				$tasks = array($outbound);
+			}
+			else
+			{
+				$tasks = array($inbound,$outbound);
+			}
 
-			foreach (array($inbound, $outbound)as $task)
+			foreach ($tasks as $task)
 			{
 				$thelabel="";
-
-				if ($this->labelstyle != 'none')
+				
+				$thelabel = $map->ProcessString($this->bwlabelformats[$task[7]],$this);
+	
+				if ($thelabel != '')
 				{
 					debug("Bandwidth is ".$task[5]."\n");
-					if ($this->labelstyle == 'bits') { $thelabel=nice_bandwidth($task[5], $this->owner->kilo); }
-					elseif ($this->labelstyle == 'unformatted') { $thelabel=$task[5]; }
-					elseif ($this->labelstyle == 'percent') { $thelabel=format_number($task[4]) . "%"; }
+					# XXX - old bwstyle code
+					# if ($this->labelstyle == 'bits') { $thelabel=nice_bandwidth($task[5], $this->owner->kilo); }
+					# elseif ($this->labelstyle == 'unformatted') { $thelabel=$task[5]; }
+					# elseif ($this->labelstyle == 'percent') { $thelabel=format_number($task[4]) . "%"; }
 
 					$padding = intval($this->get_hint('bwlabel_padding'));		
 
@@ -2357,16 +2494,51 @@ class WeatherMapLink extends WeatherMapItem
 	
 			$comparison=($this->name == 'DEFAULT'
 			? $this->inherit_fieldlist['arrowstyle'] : $this->owner->defaultlink->arrowstyle);
-	
 			if ($this->arrowstyle != $comparison) { $output.="\tARROWSTYLE " . $this->arrowstyle . "\n"; }
-	
+			
+			$comparison=($this->name == 'DEFAULT'
+			? $this->inherit_fieldlist['linkstyle'] : $this->owner->defaultlink->linkstyle);
+			if ($this->linkstyle != $comparison) { $output.="\tLINKSTYLE " . $this->linkstyle . "\n"; }
+
+			// if formats have been set, but they're just the longform of the built-in styles, set them back to the built-in styles
+			if($this->labelstyle=='--' && $this->bwlabelformats[IN] == FMT_PERC_IN && $this->bwlabelformats[OUT] == FMT_PERC_OUT)
+			{
+				$this->labelstyle = 'percent';
+			}
+			if($this->labelstyle=='--' && $this->bwlabelformats[IN] == FMT_BITS_IN && $this->bwlabelformats[OUT] == FMT_BITS_OUT)
+			{
+				$this->labelstyle = 'bits';
+			}
+			if($this->labelstyle=='--' && $this->bwlabelformats[IN] == FMT_UNFORM_IN && $this->bwlabelformats[OUT] == FMT_UNFORM_OUT)
+			{
+				$this->labelstyle = 'unformatted';
+			}
+
+			// if specific formats have been set, then the style will be '--'
+			// if it isn't then use the named style
 			$comparison=($this->name == 'DEFAULT'
 			? ($this->inherit_fieldlist['labelstyle']) : ($this->owner->defaultlink->labelstyle));
-			if ($this->labelstyle != $comparison) { $output.="\tBWLABEL " . $this->labelstyle . "\n"; }
-	
+			if ( ($this->labelstyle != $comparison) && ($this->labelstyle != '--') ) { $output.="\tBWLABEL " . $this->labelstyle . "\n"; }
+						
+			// if either IN or OUT field changes, then both must be written because a regular BWLABEL can't do it
+			$comparison = ($this->name == 'DEFAULT'
+			? ($this->inherit_fieldlist['bwlabelformats'][IN]) : ($this->owner->defaultlink->bwlabelformats[IN]));
+			$comparison2 = ($this->name == 'DEFAULT'
+			? ($this->inherit_fieldlist['bwlabelformats'][OUT]) : ($this->owner->defaultlink->bwlabelformats[OUT]));
+						
+			if ( ( $this->labelstyle == '--') && ( ($this->bwlabelformats[IN] != $comparison) || ($this->bwlabelformats[OUT]!= '--')) )
+			{
+				$output.="\tINBWFORMAT " . $this->bwlabelformats[IN]. "\n";
+				$output.="\tOUTBWFORMAT " . $this->bwlabelformats[OUT]. "\n";
+			}
+
 			$comparison=($this->name == 'DEFAULT'
 			? ($this->inherit_fieldlist['labelboxstyle']) : ($this->owner->defaultlink->labelboxstyle));
 			if ($this->labelboxstyle != $comparison) { $output.="\tBWSTYLE " . $this->labelboxstyle . "\n"; }
+	
+			$comparison=($this->name == 'DEFAULT'
+			? ($this->inherit_fieldlist['viastyle']) : ($this->owner->defaultlink->viastyle));
+			if ($this->viastyle != $comparison) { $output.="\tVIASTYLE " . $this->viastyle . "\n"; }
 	
 			$comparison = ($this->name == 'DEFAULT'
 			? $this->inherit_fieldlist['labeloffset_in'] : $this->owner->defaultlink->labeloffset_in);
@@ -2565,39 +2737,40 @@ class WeatherMapLink extends WeatherMapItem
 		$js='';
 		$js.="" . js_escape($this->name) . ": {";
 
-		if ($this->name != 'DEFAULT')
+		if ($this->name != "DEFAULT")
 		{
-			$js.="a:'" . $this->a->name . "', ";
-			$js.="b:'" . $this->b->name . "', ";
+			$js.="\"a\":\"" . $this->a->name . "\", ";
+			$js.="\"b\":\"" . $this->b->name . "\", ";
 		}
 
 		if($complete)
 		{
-			$js.="infourl:" . js_escape($this->infourl) . ", ";
-			$js.="overliburl:" . js_escape($this->overliburl). ", ";
-			$js.="width:'" . $this->width . "', ";
-			$js.="target:";
+			$js.="\"infourl\":" . js_escape($this->infourl) . ", ";
+			$js.="\"overliburl\":" . js_escape($this->overliburl). ", ";
+			$js.="\"width\":\"" . $this->width . "\", ";
+			$js.="\"target\":";
 	
-			$tgt='';
+			$tgt="";
 	
-			foreach ($this->targets as $target) { $tgt.=$target[4] . ' '; }
+			foreach ($this->targets as $target) { $tgt.=$target[4] . " "; }
 	
 			$js.=js_escape(trim($tgt));
 			$js.=",";
 	
-			$js.="bw_in:" . js_escape($this->max_bandwidth_in_cfg) . ", ";
-			$js.="bw_out:" . js_escape($this->max_bandwidth_out_cfg) . ", ";
+			$js.="\"bw_in\":" . js_escape($this->max_bandwidth_in_cfg) . ", ";
+			$js.="\"bw_out\":" . js_escape($this->max_bandwidth_out_cfg) . ", ";
 	
-			$js.="name:" . js_escape($this->name) . ", ";
-			$js.="overlibwidth:'" . $this->overlibheight . "', ";
-			$js.="overlibheight:'" . $this->overlibwidth . "', ";
-			$js.="overlibcaption:" . js_escape($this->overlibcaption) . ", ";
+			$js.="\"name\":" . js_escape($this->name) . ", ";
+			$js.="\"overlibwidth\":\"" . $this->overlibheight . "\", ";
+			$js.="\"overlibheight\":\"" . $this->overlibwidth . "\", ";
+			$js.="\"overlibcaption\":" . js_escape($this->overlibcaption) . ", ";
 		}
-		$vias = "via: [";
+		$vias = "\"via\": [";
 		foreach ($this->vialist as $via)
 				$vias .= sprintf("[%d,%d],", $via[0], $via[1]);
 		$vias .= "],";
-		$vias = str_replace("],]","]]",$vias);
+		$vias = str_replace("],],", "]]", $vias);
+		$vias = str_replace("[],", "[]", $vias);
 		$js .= $vias;
 
 		$js.="},\n";
@@ -3202,11 +3375,8 @@ function DrawLabelRotated($im, $x, $y, $angle, $text, $font, $padding, $linkname
 {
 	list($strwidth, $strheight)=$this->myimagestringsize($font, $text);
 
-	if(abs($angle)>90)
-	{
-		$angle -= 180;
-		if($angle < -180) $angle +=360;
-	}
+	if(abs($angle)>90)  $angle -= 180;
+	if($angle < -180) $angle +=360; 
 
 	$rangle = -deg2rad($angle);
 
@@ -3468,8 +3638,11 @@ function DrawLegend_Horizontal($im,$scalename="DEFAULT",$width=400)
 	imagecopy($im,$scale_im,$this->keyx[$scalename],$this->keyy[$scalename],0,0,imagesx($scale_im),imagesy($scale_im));
 	$this->keyimage[$scalename] = $scale_im;
 
+    $rx = $this->keyx[$scalename];
+    $ry = $this->keyy[$scalename];
+
 	$this->imap->addArea("Rectangle", "LEGEND:$scalename", '',
-		array($box_left, $box_top, $box_right, $box_bottom));
+		array($rx+$box_left, $ry+$box_top, $rx+$box_right, $ry+$box_bottom));
 }
 
 function DrawLegend_Vertical($im,$scalename="DEFAULT",$height=400)
@@ -3546,8 +3719,10 @@ function DrawLegend_Vertical($im,$scalename="DEFAULT",$height=400)
 	imagecopy($im,$scale_im,$this->keyx[$scalename],$this->keyy[$scalename],0,0,imagesx($scale_im),imagesy($scale_im));
 	$this->keyimage[$scalename] = $scale_im;
 
+    $rx = $this->keyx[$scalename];
+    $ry = $this->keyy[$scalename];
 	$this->imap->addArea("Rectangle", "LEGEND:$scalename", '',
-		array($box_left, $box_top, $box_right, $box_bottom));
+		array($rx+$box_left, $ry+$box_top, $rx+$box_right, $ry+$box_bottom));
 }
 
 function DrawLegend_Classic($im,$scalename="DEFAULT")
@@ -3990,6 +4165,82 @@ function ReadConfig($filename)
 					$linematched++;
 				}
 
+				if ($last_seen == 'LINK' && preg_match(
+					"/^\s*BWLABEL\s+(bits|percent|unformatted|none)\s*$/i", $buffer,
+					$matches))
+				{
+					$format_in = '';
+					$format_out = '';
+					$style = strtolower($matches[1]);
+					if($style=='percent')
+					{
+						$format_in = FMT_PERC_IN;
+						$format_out = FMT_PERC_OUT;
+					}
+					if($style=='bits')
+					{
+						$format_in = FMT_BITS_IN;
+						$format_out = FMT_BITS_OUT;
+					}
+					if($style=='unformatted')
+					{
+						$format_in = FMT_UNFORM_IN;
+						$format_out = FMT_UNFORM_OUT;
+					}
+										
+					$curlink->labelstyle=$style;
+					$curlink->bwlabelformats[IN] = $format_in;
+					$curlink->bwlabelformats[OUT] = $format_out;
+					$linematched++;
+				}
+
+				if ($last_seen == 'LINK' && preg_match(
+					"/^\s*LINKSTYLE\s+(twoway|oneway)\s*$/i", $buffer,
+					$matches))
+				{
+					$curlink->linkstyle=$matches[1];
+					$linematched++;
+				}
+
+				if ($last_seen == 'LINK' && preg_match(
+					"/^\s*BWSTYLE\s+(classic|angled)\s*$/i", $buffer,
+					$matches))
+				{
+					$curlink->labelboxstyle=$matches[1];
+					$linematched++;
+				}
+				
+				if ($last_seen == 'LINK' && preg_match(
+					// "/^\s*VIASTYLE\s+(curved|angled)\s*$/i", $buffer,
+					"/^\s*VIASTYLE\s+(curved)\s*$/i", $buffer,
+					$matches))
+				{
+					$curlink->viastyle=$matches[1];
+					$linematched++;
+				}
+
+				if ($last_seen == 'LINK' && preg_match(
+					"/^\s*BWLABELPOS\s+(\d+)\s(\d+)\s*$/i", $buffer,
+					$matches))
+				{
+					$curlink->labeloffset_in = $matches[1];
+					$curlink->labeloffset_out = $matches[2];
+					$linematched++;
+				}
+
+				if ( ($last_seen == 'LINK') && (preg_match("/^\s*INBWFORMAT\s+(.*)\s*$/i", $buffer, $matches)))
+				{
+					$curlink->bwlabelformats[IN] = $matches[1];
+					$curlink->labelstyle='--'; // mark that at least one direction is special
+					$linematched++;
+				}
+				
+				if ( ($last_seen == 'LINK') && (preg_match("/^\s*OUTBWFORMAT\s+(.*)\s*$/i", $buffer, $matches)))
+				{
+					$curlink->bwlabelformats[OUT] = $matches[1];
+					$curlink->labelstyle='--'; // mark that at least one direction is special
+					$linematched++;
+				}
 
 				if ( ($last_seen == 'LINK') && (preg_match("/^\s*(BANDWIDTH|MAXVALUE)\s+(\d+\.?\d*[KMGT]?)\s*$/i", $buffer, $matches)))
 				{
@@ -4177,30 +4428,6 @@ function ReadConfig($filename)
 					$linematched++;
 				}
 
-				if ($last_seen == 'LINK' && preg_match(
-					"/^\s*BWLABEL\s+(bits|percent|unformatted|none)\s*$/i", $buffer,
-					$matches))
-				{
-					$curlink->labelstyle=strtolower($matches[1]);
-					$linematched++;
-				}
-
-				if ($last_seen == 'LINK' && preg_match(
-					"/^\s*BWSTYLE\s+(classic|angled)\s*$/i", $buffer,
-					$matches))
-				{
-					$curlink->labelboxstyle=$matches[1];
-					$linematched++;
-				}
-
-				if ($last_seen == 'LINK' && preg_match(
-					"/^\s*BWLABELPOS\s+(\d+)\s(\d+)\s*$/i", $buffer,
-					$matches))
-				{
-					$curlink->labeloffset_in = $matches[1];
-					$curlink->labeloffset_out = $matches[2];
-					$linematched++;
-				}
 				
 				if ($last_seen == 'LINK' && preg_match(
 					"/^\s*COMMENTPOS\s+(\d+)\s(\d+)\s*$/i", $buffer,
@@ -4912,7 +5139,7 @@ function AllocateScaleColours($im,$refname='gdref1')
 	}
 }
 
-function DrawMap($filename = '', $thumbnailfile = '', $thumbnailmax = 250, $withnodes = TRUE)
+function DrawMap($filename = '', $thumbnailfile = '', $thumbnailmax = 250, $withnodes = TRUE, $use_overlay = FALSE)
 {
 	$bgimage=NULL;
 	$this->cachefile_version = crc32(file_get_contents($this->configfile));
@@ -5012,6 +5239,45 @@ function DrawMap($filename = '', $thumbnailfile = '', $thumbnailmax = 250, $with
 		$this->DrawTitle($image, $this->titlefont, $this->colours['DEFAULT']['TITLE']['gdref1']);
 
 		# $this->DrawNINK($image,300,300,48);
+
+		// for the editor, we can optionally overlay some other stuff
+                if($this->context == 'editor')
+                {
+			if($use_overlay)
+			{
+			$overlay = myimagecolorallocate($image, 200, 0, 0);
+
+			// first, we can show relatively positioned NODEs
+                        foreach ($this->nodes as $node) {
+                                if($node->relative_to != '')
+                                {
+                                        $rel_x = $this->nodes[$node->relative_to]->x;
+                                        $rel_y = $this->nodes[$node->relative_to]->y;
+                                        imagearc($image,$node->x, $node->y,
+                                                15,15,0,360,$overlay);
+                                        imagearc($image,$node->x, $node->y,
+                                                16,16,0,360,$overlay);
+
+                                        imageline($image,$node->x, $node->y,
+                                                $rel_x, $rel_y, $overlay);
+                                }
+                        }
+		
+			// then overlay VIAs, so they can be seen	
+			foreach($this->links as $link)
+			{
+				foreach ($link->vialist as $via)
+				{
+                        		imagearc($image, $via[0],$via[1],10,10,0,360,$overlay);
+                        		imagearc($image, $via[0],$via[1],12,12,0,360,$overlay);
+               			 }
+
+		
+			}
+			}
+                }
+
+
 
 		// Ready to output the results...
 
@@ -5313,7 +5579,7 @@ function asJSON()
 
 	$json .= "{ \n";
 
-	$json .= "'map': {  \n";
+	$json .= "\"map\": {  \n";
 	foreach (array_keys($this->inherit_fieldlist)as $fld)
 	{
 		$json .= js_escape($fld).": ";
@@ -5323,7 +5589,7 @@ function asJSON()
 	$json = rtrim($json,", \n");
 	$json .= "\n},\n";
 
-	$json .= "'nodes': {\n";
+	$json .= "\"nodes\": {\n";
 	$json .= $this->defaultnode->asJSON();
 	foreach ($this->nodes as $node) { $json .= $node->asJSON(); }
 	$json = rtrim($json,", \n");
@@ -5331,7 +5597,7 @@ function asJSON()
 
 
 
-	$json .= "'links': {\n";
+	$json .= "\"links\": {\n";
 	$json .= $this->defaultlink->asJSON();
 	foreach ($this->links as $link) { $json .= $link->asJSON(); }
 	$json = rtrim($json,", \n");
@@ -5345,7 +5611,7 @@ function asJSON()
 	$json .= "\n]\n";
 	$json .= "\n";
 
-	$json .= ", valid: 1}\n";
+	$json .= ", 'valid': 1}\n";
 
 	return($json);
 }
